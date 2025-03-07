@@ -2,13 +2,13 @@
  * Aplicação de Visualização Geoespacial
  * 
  * Esta aplicação carrega e exibe dados geoespaciais de fronteiras e trajetórias em um mapa.
- * Permite navegação no tempo através de diferentes camadas, filtro por limites e exibição
+ * Permite naveção no tempo através de diferentes camadas, filtro por limites e exibição
  * de informações sobre as características geoespaciais.
  */
 
 // ============ CONFIGURAÇÕES E CONSTANTES ============
 const CONFIG = {
-  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_'],
+  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_','expansion','inside_clusters'],
   DEFAULT_THRESHOLD: "235.0",
   AUTO_CHECK_INTERVAL: 60000, // 60 segundos
   TIME_OFFSET: -3, // UTC-3 horas
@@ -34,7 +34,7 @@ const CONFIG = {
     TRAJECTORY_API: ""
   },
   CHART: {
-    EVOLUTION_VARIABLES: ['size', 'min', 'max'], // Variáveis que podem ser exibidas no gráfico de evolução
+    EVOLUTION_VARIABLES: ['size', 'min', 'expansion','inside_clusters'], // Variáveis que podem ser exibidas no gráfico de evolução
     DEFAULT_VARIABLE: 'size' // Variável exibida por padrão
   },
   DOM_IDS: {
@@ -224,26 +224,33 @@ document.addEventListener("DOMContentLoaded", () => {
       const timestamp = extractTimestampFromFileName(layer.fileName);
       if (!timestamp) return;
       
-      // Armazenar o ponto de dados
-      dataPoints.push({
+      // Criar objeto base com timestamp e data para ordenação
+      const dataPoint = {
         timestamp: timestamp,
-        originalDate: new Date(timestamp), // Para ordenação correta
-        size: parseFloat(feature.properties.size || 0),
-        min: parseFloat(feature.properties.min || 0),
-        max: parseFloat(feature.properties.max || 0)
+        originalDate: new Date(timestamp)
+      };
+      
+      // Adicionar dinamicamente todas as variáveis configuradas
+      CONFIG.CHART.EVOLUTION_VARIABLES.forEach(variable => {
+        dataPoint[variable] = parseFloat(feature.properties[variable] || 0);
       });
+      
+      // Armazenar o ponto de dados
+      dataPoints.push(dataPoint);
     });
     
     // Ordenar pelo timestamp real (data)
     dataPoints.sort((a, b) => a.originalDate - b.originalDate);
     
-    // Separar em arrays para o gráfico
+    // Preparar estrutura base para o resultado
     const timeSeriesData = {
-      timestamps: dataPoints.map(p => p.timestamp),
-      size: dataPoints.map(p => p.size),
-      min: dataPoints.map(p => p.min),
-      max: dataPoints.map(p => p.max)
+      timestamps: dataPoints.map(p => p.timestamp)
     };
+    
+    // Popular dinamicamente os arrays de valores para cada variável
+    CONFIG.CHART.EVOLUTION_VARIABLES.forEach(variable => {
+      timeSeriesData[variable] = dataPoints.map(p => p[variable]);
+    });
     
     // Armazena no cache para uso futuro
     if (!state.dataCache) state.dataCache = {};
@@ -286,13 +293,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // Se não encontrou (findIndex retorna -1), usar todos os dados
     if (currentIndex === -1) currentIndex = allTimeSeriesData.timestamps.length;
     
-    // Filtrar dados até o timestamp atual
+    // Filtrar dados até o timestamp atual - estrutura base
     const timeSeriesData = {
-      timestamps: allTimeSeriesData.timestamps.slice(0, currentIndex),
-      size: allTimeSeriesData.size.slice(0, currentIndex),
-      min: allTimeSeriesData.min.slice(0, currentIndex),
-      max: allTimeSeriesData.max.slice(0, currentIndex)
+      timestamps: allTimeSeriesData.timestamps.slice(0, currentIndex)
     };
+    
+    // Adicionar dinamicamente todas as variáveis
+    CONFIG.CHART.EVOLUTION_VARIABLES.forEach(variable => {
+      if (allTimeSeriesData[variable]) {
+        timeSeriesData[variable] = allTimeSeriesData[variable].slice(0, currentIndex);
+      }
+    });
     
     // Formatar os timestamps para melhor legibilidade
     const formattedLabels = timeSeriesData.timestamps.map(ts => {
@@ -817,6 +828,17 @@ document.addEventListener("DOMContentLoaded", () => {
               showLayerAtIndex(state.geojsonLayers.length - 1);
               state.playing = false;
               elements.playPauseBtn.textContent = "Play";
+              
+              // Verificar se havia um sistema selecionado antes do recarregamento
+              const previouslySelectedUid = localStorage.getItem('selectedSystemUid');
+              if (previouslySelectedUid) {
+                // Tentar selecionar o mesmo sistema após o recarregamento
+                setTimeout(() => {
+                  selectPolygonByUid(previouslySelectedUid);
+                  // Limpar o UID armazenado após restaurar a seleção
+                  localStorage.removeItem('selectedSystemUid');
+                }, 500); // Pequeno atraso para garantir que a camada esteja completamente carregada
+              }
             }
           });
       });
@@ -837,6 +859,12 @@ document.addEventListener("DOMContentLoaded", () => {
       
       if (newFiles.length > 0) {
         console.log("Novos arquivos encontrados, recarregando...");
+        
+        // Salvar o UID do sistema selecionado antes do recarregamento
+        if (state.selection.uid) {
+          localStorage.setItem('selectedSystemUid', state.selection.uid);
+        }
+        
         localStorage.setItem('boundaryFiles', JSON.stringify(files));
         location.reload();
       }
