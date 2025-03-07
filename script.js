@@ -25,7 +25,8 @@ const CONFIG = {
   },
   STYLES: {
     BOUNDARY: { color: "#3388ff", weight: 1, opacity: 1, fillOpacity: 0.2 },
-    TRAJECTORY: { color: "#FF0000", weight: 2, opacity: 0.7 }
+    TRAJECTORY: { color: "#FF0000", weight: 2, opacity: 0.7 },
+    SELECTED: { color: "#FF00FF", weight: 3, opacity: 1, fillOpacity: 0.3 } // Estilo para polígono selecionado
   },
   GITHUB: {
     RAW_URL: "https://raw.githubusercontent.com/fortracc/fortracc.github.io/main/",
@@ -44,7 +45,10 @@ const state = {
   currentThresholdFilter: CONFIG.DEFAULT_THRESHOLD,
   currentBoundaryLayer: null,
   currentTrajectoryLayer: null,
-  displayOptions: CONFIG.DISPLAY_KEYS.reduce((acc, key) => (acc[key] = false, acc), {})
+  displayOptions: CONFIG.DISPLAY_KEYS.reduce((acc, key) => (acc[key] = false, acc), {}),
+  selectedFeature: null,     // Armazena feature selecionada
+  selectedLayer: null,       // Armazena layer selecionada
+  selectedFeatureUid: null   // Armazena o UID do feature selecionado para persistência entre camadas
 };
 
 // ============ UTILITÁRIOS ============
@@ -101,6 +105,22 @@ const utils = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Adicione no início do DOMContentLoaded
+  // Estilo para os popups de features
+  const popupStyle = document.createElement('style');
+  popupStyle.textContent = `
+    .feature-popup {
+      padding: 5px;
+      max-width: 300px;
+      font-size: 14px;
+    }
+    .feature-popup strong {
+      font-weight: bold;
+      color: #333;
+    }
+  `;
+  document.head.appendChild(popupStyle);
+
   // ============ INICIALIZAÇÃO DE UI ============
   const elements = {
     map: L.map("map", {
@@ -251,11 +271,83 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   const updateBoundaryLayer = () => {
     if (state.currentBoundaryLayer) elements.map.removeLayer(state.currentBoundaryLayer);
+    
+    // Resetar apenas as referências à layer e feature, mantendo o UID
+    state.selectedFeature = null;
+    state.selectedLayer = null;
+    
     let obj = state.geojsonLayers[state.currentIndex];
     state.currentBoundaryLayer = L.geoJSON(obj.geojson, {
       filter: passesThreshold,
-      style: CONFIG.STYLES.BOUNDARY
+      style: feature => {
+        // Aplica estilo de seleção se o feature tiver o UID selecionado
+        return state.selectedFeatureUid && feature.properties.uid === state.selectedFeatureUid 
+          ? CONFIG.STYLES.SELECTED 
+          : CONFIG.STYLES.BOUNDARY;
+      },
+      onEachFeature: (feature, layer) => {
+        // Adiciona evento de clique para mostrar informações do polígono
+        layer.on('click', (e) => {
+          L.DomEvent.stopPropagation(e); // Evita a propagação do evento para o mapa
+          
+          // Se estamos clicando no mesmo polígono, desseleciona
+          if (state.selectedFeatureUid === feature.properties.uid) {
+            // Desselecionar completamente
+            state.selectedFeatureUid = null;
+            state.selectedFeature = null;
+            state.selectedLayer = null;
+            
+            // Restaurar o estilo padrão
+            layer.setStyle(CONFIG.STYLES.BOUNDARY);
+            updateMarkers(); // Atualiza os marcadores para mostrar todos
+            return;
+          }
+          
+          // Resetar o estilo de todos os polígonos
+          state.currentBoundaryLayer.eachLayer(l => {
+            state.currentBoundaryLayer.resetStyle(l);
+          });
+          
+          // Define este como o novo polígono selecionado
+          state.selectedFeatureUid = feature.properties.uid;
+          state.selectedFeature = feature;
+          state.selectedLayer = layer;
+          
+          // Aplica estilo de destaque ao polígono selecionado
+          layer.setStyle(CONFIG.STYLES.SELECTED);
+          
+          // Verifica se há opções de exibição ativas
+          const hasActiveOptions = Object.values(state.displayOptions).some(val => val);
+          
+          // Se não houver opções ativas, ativa automaticamente a exibição do UID
+          if (!hasActiveOptions && CONFIG.DISPLAY_KEYS.includes('uid')) {
+            state.displayOptions.uid = true;
+            const uidCheckbox = document.querySelector(`input[name="uid"]`);
+            if (uidCheckbox) uidCheckbox.checked = true;
+          }
+          
+          // Atualiza os marcadores para mostrar apenas este polígono
+          updateMarkers();
+        });
+      }
     });
+    
+    // Adicionar evento de clique no mapa para limpar a seleção
+    elements.map.off('click'); // Remove eventos anteriores para evitar duplicação
+    elements.map.on('click', function() {
+      if (state.selectedFeatureUid) {
+        // Limpar tudo
+        state.currentBoundaryLayer.eachLayer(layer => {
+          state.currentBoundaryLayer.resetStyle(layer);
+        });
+        
+        state.selectedFeatureUid = null;
+        state.selectedFeature = null;
+        state.selectedLayer = null;
+        updateMarkers(); // Atualiza marcadores para mostrar todos conforme config global
+      }
+    });
+    
     state.currentBoundaryLayer.addTo(elements.map);
   };
 
@@ -266,30 +358,39 @@ document.addEventListener("DOMContentLoaded", () => {
     markerGroup.clearLayers();
     if (!state.geojsonLayers[state.currentIndex]) return;
     
-    state.geojsonLayers[state.currentIndex].geojson.features
-      .filter(passesThreshold)
-      .forEach(feature => {
-        const centroid = computeCentroid(feature);
-        if (!centroid) return;
-        
-        let infoText = "";
-        CONFIG.DISPLAY_KEYS.forEach(field => {
-          if (state.displayOptions[field] && feature.properties && feature.properties[field] !== undefined) {
-            infoText += `${field}: ${feature.properties[field]}<br>`;
-          }
-        });
-        
-        if (infoText) {
-          const marker = L.marker(centroid, { opacity: 0 });
-          marker.bindTooltip(infoText, { 
-            permanent: true, 
-            direction: "top", 
-            offset: [0, -10], 
-            className: "centroid-tooltip" 
-          });
-          markerGroup.addLayer(marker);
+    // Filtra features pela threshold e pela seleção
+    const filteredFeatures = state.geojsonLayers[state.currentIndex].geojson.features
+      .filter(feature => {
+        // Se tiver uma feature selecionada, mostra apenas ela
+        if (state.selectedFeature) {
+          return feature.properties.uid === state.selectedFeature.properties.uid && passesThreshold(feature);
+        }
+        // Caso contrário, mostra todas que passam pelo threshold
+        return passesThreshold(feature);
+      });
+    
+    filteredFeatures.forEach(feature => {
+      const centroid = computeCentroid(feature);
+      if (!centroid) return;
+      
+      let infoText = "";
+      CONFIG.DISPLAY_KEYS.forEach(field => {
+        if (state.displayOptions[field] && feature.properties && feature.properties[field] !== undefined) {
+          infoText += `${field}: ${feature.properties[field]}<br>`;
         }
       });
+      
+      if (infoText) {
+        const marker = L.marker(centroid, { opacity: 0 });
+        marker.bindTooltip(infoText, { 
+          permanent: true, 
+          direction: "top", 
+          offset: [0, -10], 
+          className: "centroid-tooltip" 
+        });
+        markerGroup.addLayer(marker);
+      }
+    });
   };
 
   // ============ CARREGAMENTO DE DADOS ============
@@ -546,6 +647,12 @@ document.addEventListener("DOMContentLoaded", () => {
     removeCurrentLayer();
     state.currentIndex = index;
     updateBoundaryLayer();
+    
+    // Se há um UID selecionado, tentar encontrar o polígono correspondente na nova camada
+    if (state.selectedFeatureUid) {
+      selectPolygonByUid(state.selectedFeatureUid);
+    }
+    
     updateMarkers();
     updateTimestampInfo(state.geojsonLayers[state.currentIndex]);
     updateTrajectoryDisplay();
@@ -611,3 +718,33 @@ document.addEventListener("DOMContentLoaded", () => {
   // Verificar novos arquivos periodicamente
   setInterval(checkForNewBoundaryFiles, CONFIG.AUTO_CHECK_INTERVAL);
 });
+
+/**
+ * Seleciona um polígono pelo seu UID
+ */
+const selectPolygonByUid = (uid) => {
+  let found = false;
+  
+  state.currentBoundaryLayer.eachLayer(layer => {
+    if (layer.feature && layer.feature.properties && layer.feature.properties.uid === uid) {
+      // Encontramos o polígono com o mesmo UID
+      state.selectedFeature = layer.feature;
+      state.selectedLayer = layer;
+      // Aplicar estilo
+      layer.setStyle(CONFIG.STYLES.SELECTED);
+      found = true;
+    }
+  });
+  
+  if (found) {
+    // Se encontramos o polígono, mantemos o UID selecionado
+    state.selectedFeatureUid = uid;
+  } else {
+    // Se não encontramos o polígono com este UID nesta camada, limpamos a seleção
+    state.selectedFeatureUid = null;
+    state.selectedFeature = null;
+    state.selectedLayer = null;
+  }
+  
+  return found;
+};
