@@ -125,14 +125,14 @@ document.addEventListener("DOMContentLoaded", () => {
   `;
   document.head.appendChild(popupStyle);
 
-  // Modificar o container do gráfico para ficar no topo direito
+  // Modificar o container do gráfico para ficar no topo direito com maior largura
   const chartContainer = document.createElement("div");
   chartContainer.id = "polygon-chart-container";
-  chartContainer.style.cssText = "position: absolute; top: 10px; right: 10px; width: 380px; height: 250px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 10px; display: none; z-index: 1000;";
+  chartContainer.style.cssText = "position: absolute; top: 10px; right: 10px; width: 450px; height: 280px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 10px; display: none; z-index: 1000;";
   
   const chartTitle = document.createElement("h4");
   chartTitle.style.cssText = "margin: 0 0 10px 0; font-size: 14px; text-align: center;";
-  chartTitle.textContent = "Evolução do Polígono";
+  chartTitle.textContent = "System Evolution";
   
   // Adicionar seletor de variável para o gráfico
   const variableSelector = document.createElement("select");
@@ -148,10 +148,11 @@ document.addEventListener("DOMContentLoaded", () => {
     variableSelector.appendChild(option);
   });
   
+  // Ajustar a altura do canvas para o gráfico
   const chartCanvas = document.createElement("canvas");
   chartCanvas.id = "polygon-chart";
   chartCanvas.style.width = "100%";
-  chartCanvas.style.height = "170px";
+  chartCanvas.style.height = "200px"; // Aumentar a altura do canvas
   
   const closeButton = document.createElement("button");
   closeButton.textContent = "×";
@@ -256,9 +257,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const props = feature.properties;
     const uid = props.uid || "N/A";
     
-    chartTitle.textContent = `Evolução do Polígono UID: ${uid}`;
+    // Atualizar com o novo formato de título
+    chartTitle.textContent = `System Evolution UID: ${uid}`;
     
     // Coletar dados ao longo do tempo para este polígono
+    
     const allTimeSeriesData = collectPolygonDataOverTime(uid);
     
     // Verificar se Chart.js está disponível
@@ -287,6 +290,12 @@ document.addEventListener("DOMContentLoaded", () => {
       max: allTimeSeriesData.max.slice(0, currentIndex)
     };
     
+    // Formatar os timestamps para melhor legibilidade
+    const formattedLabels = timeSeriesData.timestamps.map(ts => {
+      // Extrair apenas a parte de hora:minuto
+      return ts.split(' ')[1];
+    });
+    
     // Obter a variável selecionada
     const selectedVariable = document.getElementById("variable-selector").value;
     
@@ -299,7 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
     polygonChart = new Chart(document.getElementById('polygon-chart'), {
       type: 'line',
       data: {
-        labels: timeSeriesData.timestamps,
+        labels: formattedLabels,
         datasets: [{
           label: selectedVariable.charAt(0).toUpperCase() + selectedVariable.slice(1),
           data: timeSeriesData[selectedVariable],
@@ -338,7 +347,9 @@ document.addEventListener("DOMContentLoaded", () => {
           tooltip: {
             callbacks: {
               title: (items) => {
-                return `Timestamp: ${items[0].label}`;
+                // Mostrar o timestamp completo apenas no tooltip
+                const idx = items[0].dataIndex;
+                return `Timestamp: ${timeSeriesData.timestamps[idx]}`;
               },
               afterLabel: (context) => {
                 return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
@@ -351,7 +362,20 @@ document.addEventListener("DOMContentLoaded", () => {
           x: {
             title: {
               display: true,
-              text: 'Timestamp'
+              text: 'Time',
+              padding: {
+                top: 10 // Adicionar padding para acomodar os rótulos
+              }
+            },
+            ticks: {
+              maxRotation: 45,
+              minRotation: 45,
+              autoSkip: true,
+              maxTicksLimit: 8, // Reduzir o número de rótulos para evitar sobreposição
+              padding: 8, // Adicionar padding aos rótulos
+              font: {
+                size: 10 // Reduzir o tamanho da fonte para caber melhor
+              }
             }
           },
           y: {
