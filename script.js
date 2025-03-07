@@ -123,14 +123,22 @@ const utils = {
  * Salva o estado atual da visualização do mapa
  */
 const saveMapViewState = () => {
-  const mapCenter = elements.map.getCenter();
-  const mapZoom = elements.map.getZoom();
-  const viewState = {
-    center: [mapCenter.lat, mapCenter.lng],
-    zoom: mapZoom
-  };
-  
-  localStorage.setItem('mapViewState', JSON.stringify(viewState));
+  try {
+    const mapCenter = elements.map.getCenter();
+    const mapZoom = elements.map.getZoom();
+    
+    // Verificar se os valores são válidos antes de salvar
+    if (mapCenter && !isNaN(mapCenter.lat) && !isNaN(mapCenter.lng) && !isNaN(mapZoom)) {
+      const viewState = {
+        center: [mapCenter.lat, mapCenter.lng],
+        zoom: mapZoom
+      };
+      
+      localStorage.setItem('mapViewState', JSON.stringify(viewState));
+    }
+  } catch (e) {
+    console.error("Erro ao salvar estado do mapa:", e);
+  }
 };
 
 /**
@@ -141,7 +149,17 @@ const restoreMapViewState = () => {
   if (savedView) {
     try {
       const viewState = JSON.parse(savedView);
-      elements.map.setView(viewState.center, viewState.zoom);
+      // Verificar se os valores são válidos antes de aplicar
+      if (viewState.center && 
+          Array.isArray(viewState.center) && 
+          viewState.center.length === 2 &&
+          !isNaN(viewState.center[0]) && 
+          !isNaN(viewState.center[1]) && 
+          !isNaN(viewState.zoom)) {
+        elements.map.setView(viewState.center, viewState.zoom);
+      } else {
+        console.warn("Dados de visualização inválidos, usando valores padrão");
+      }
     } catch (e) {
       console.error("Erro ao restaurar estado do mapa:", e);
     }
@@ -901,10 +919,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, 500); // Pequeno atraso para garantir que a camada esteja completamente carregada
               }
               
-              // Restaurar o estado da visualização do mapa após tudo estar carregado
+              // Restaurar o estado da visualização do mapa apenas após tudo estar pronto
+              // e todas as layers estiverem renderizadas
               setTimeout(() => {
                 restoreMapViewState();
-              }, 800); // Um atraso um pouco maior para garantir que tudo está pronto
+                // Forçar uma atualização de exibição para garantir que tudo esteja corretamente posicionado
+                updateBoundaryLayer();
+                updateMarkers();
+                if (elements.showTrajectoryCheckbox.checked) {
+                  loadTrajectoryForCurrentLayer();
+                }
+              }, 1000);
             }
           });
       });
