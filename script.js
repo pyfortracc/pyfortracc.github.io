@@ -32,6 +32,10 @@ const CONFIG = {
     RAW_URL: "https://raw.githubusercontent.com/fortracc/fortracc.github.io/main/",
     BOUNDARY_API: "",
     TRAJECTORY_API: ""
+  },
+  CHART: {
+    EVOLUTION_VARIABLES: ['size', 'min', 'max'], // Variáveis que podem ser exibidas no gráfico de evolução
+    DEFAULT_VARIABLE: 'size' // Variável exibida por padrão
   }
 };
 
@@ -120,6 +124,382 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   `;
   document.head.appendChild(popupStyle);
+
+  // Modificar o container do gráfico para ficar no topo direito
+  const chartContainer = document.createElement("div");
+  chartContainer.id = "polygon-chart-container";
+  chartContainer.style.cssText = "position: absolute; top: 10px; right: 10px; width: 380px; height: 250px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 10px; display: none; z-index: 1000;";
+  
+  const chartTitle = document.createElement("h4");
+  chartTitle.style.cssText = "margin: 0 0 10px 0; font-size: 14px; text-align: center;";
+  chartTitle.textContent = "Evolução do Polígono";
+  
+  // Adicionar seletor de variável para o gráfico
+  const variableSelector = document.createElement("select");
+  variableSelector.id = "variable-selector";
+  variableSelector.style.cssText = "display: block; margin: 5px auto; width: 80%;";
+  CONFIG.CHART.EVOLUTION_VARIABLES.forEach(variable => {
+    const option = document.createElement("option");
+    option.value = variable;
+    option.text = variable.charAt(0).toUpperCase() + variable.slice(1);
+    if (variable === CONFIG.CHART.DEFAULT_VARIABLE) {
+      option.selected = true;
+    }
+    variableSelector.appendChild(option);
+  });
+  
+  const chartCanvas = document.createElement("canvas");
+  chartCanvas.id = "polygon-chart";
+  chartCanvas.style.width = "100%";
+  chartCanvas.style.height = "170px";
+  
+  const closeButton = document.createElement("button");
+  closeButton.textContent = "×";
+  closeButton.style.cssText = "position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 5px;";
+  closeButton.addEventListener("click", () => {
+    chartContainer.style.display = "none";
+  });
+  
+  chartContainer.appendChild(closeButton);
+  chartContainer.appendChild(chartTitle);
+  chartContainer.appendChild(variableSelector);
+  chartContainer.appendChild(chartCanvas);
+  document.body.appendChild(chartContainer);
+  
+  // Adicionar a biblioteca Chart.js
+  const chartScript = document.createElement("script");
+  chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js";
+  chartScript.onload = function() {
+    console.log("Chart.js carregado com sucesso");
+  };
+  document.head.appendChild(chartScript);
+  
+  // Variável para armazenar a instância do gráfico
+  let polygonChart = null;
+
+  // Adicionar change event ao seletor de variável
+  variableSelector.addEventListener("change", () => {
+    if (state.selectedFeature) {
+      updatePolygonChart(state.selectedFeature);
+    }
+  });
+
+  /**
+   * Função que coleta dados do polígono em todas as camadas de tempo
+   */
+  const collectPolygonDataOverTime = (uid) => {
+    // Array para armazenar dados temporais ordenados
+    const dataPoints = [];
+    
+    // Percorre todas as camadas para encontrar o mesmo UID
+    state.geojsonLayers.forEach(layer => {
+      if (layer.geojson && layer.geojson.features) {
+        // Encontra o polígono com o UID específico nesta camada
+        const feature = layer.geojson.features.find(f => 
+          f.properties && f.properties.uid === uid);
+        
+        if (feature && feature.properties) {
+          // Extrai timestamp do nome do arquivo
+          const fileNameMatch = layer.fileName.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+          if (fileNameMatch) {
+            const [_, year, month, day, hour, minute] = fileNameMatch;
+            
+            // Criar data em UTC e aplicar ajustes
+            const utcDate = new Date(Date.UTC(
+              parseInt(year),
+              parseInt(month) - 1,
+              parseInt(day),
+              parseInt(hour),
+              parseInt(minute)
+            ));
+            
+            const offsetMilliseconds = CONFIG.TIME_OFFSET * 60 * 60 * 1000;
+            const incrementMilliseconds = CONFIG.TIME_INCREMENT * 60 * 1000;
+            const localDate = new Date(utcDate.getTime() + offsetMilliseconds + incrementMilliseconds);
+            
+            // Formatar a data para exibição
+            const ts = localDate.toISOString().replace('T', ' ').substring(0, 16);
+            
+            // Armazenar o ponto de dados com seu timestamp original para ordenação posterior
+            dataPoints.push({
+              timestamp: ts,
+              originalDate: localDate, // Para ordenação correta
+              size: parseFloat(feature.properties.size || 0),
+              min: parseFloat(feature.properties.min || 0),
+              max: parseFloat(feature.properties.max || 0)
+            });
+          }
+        }
+      }
+    });
+    
+    // Ordenar pelo timestamp real (data)
+    dataPoints.sort((a, b) => a.originalDate - b.originalDate);
+    
+    // Separar em arrays para o gráfico
+    const timeSeriesData = {
+      timestamps: dataPoints.map(p => p.timestamp),
+      size: dataPoints.map(p => p.size),
+      min: dataPoints.map(p => p.min),
+      max: dataPoints.map(p => p.max)
+    };
+    
+    return timeSeriesData;
+  };
+
+  /**
+   * Atualiza o gráfico com dados do polígono selecionado
+   */
+  const updatePolygonChart = (feature) => {
+    if (!feature || !feature.properties) return;
+    
+    const props = feature.properties;
+    const uid = props.uid || "N/A";
+    
+    chartTitle.textContent = `Evolução do Polígono UID: ${uid}`;
+    
+    // Coletar dados ao longo do tempo para este polígono
+    const allTimeSeriesData = collectPolygonDataOverTime(uid);
+    
+    // Verificar se Chart.js está disponível
+    if (typeof Chart === "undefined") {
+      console.error("Chart.js não foi carregado ainda");
+      return;
+    }
+    
+    // Encontrar o índice do timestamp atual
+    const currentFileName = state.geojsonLayers[state.currentIndex].fileName;
+    const currentTimestamp = extractTimestampFromFileName(currentFileName);
+    
+    // Filtrar dados até o timestamp atual
+    let currentIndex = allTimeSeriesData.timestamps.findIndex(ts => 
+      new Date(ts) > new Date(currentTimestamp)
+    );
+    
+    // Se não encontrou (findIndex retorna -1), usar todos os dados
+    if (currentIndex === -1) currentIndex = allTimeSeriesData.timestamps.length;
+    
+    // Filtrar dados até o timestamp atual
+    const timeSeriesData = {
+      timestamps: allTimeSeriesData.timestamps.slice(0, currentIndex),
+      size: allTimeSeriesData.size.slice(0, currentIndex),
+      min: allTimeSeriesData.min.slice(0, currentIndex),
+      max: allTimeSeriesData.max.slice(0, currentIndex)
+    };
+    
+    // Obter a variável selecionada
+    const selectedVariable = document.getElementById("variable-selector").value;
+    
+    // Destruir gráfico anterior se existir
+    if (polygonChart) {
+      polygonChart.destroy();
+    }
+    
+    // Criar novo gráfico de linha
+    polygonChart = new Chart(document.getElementById('polygon-chart'), {
+      type: 'line',
+      data: {
+        labels: timeSeriesData.timestamps,
+        datasets: [{
+          label: selectedVariable.charAt(0).toUpperCase() + selectedVariable.slice(1),
+          data: timeSeriesData[selectedVariable],
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          tension: 0.1,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          // Destaque para o último ponto
+          pointBackgroundColor: (context) => {
+            return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
+              'rgb(255, 0, 0)' : 'rgb(75, 192, 192)';
+          },
+          pointBorderColor: (context) => {
+            return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
+              'rgb(255, 0, 0)' : 'rgb(75, 192, 192)';
+          },
+          pointRadius: (context) => {
+            return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
+              6 : 4;
+          },
+          pointStyle: (context) => {
+            return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
+              'circle' : 'circle';
+          }
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                return `Timestamp: ${items[0].label}`;
+              },
+              afterLabel: (context) => {
+                return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
+                  'Atual' : '';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Timestamp'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: selectedVariable.charAt(0).toUpperCase() + selectedVariable.slice(1)
+            },
+            ticks: {
+              callback: function(value) {
+                return Number.isInteger(value) ? value : value.toFixed(2);
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Mostrar o container do gráfico
+    chartContainer.style.display = "block";
+  };
+
+  /**
+   * Extrai timestamp de um nome de arquivo
+   */
+  const extractTimestampFromFileName = (fileName) => {
+    const fileNameMatch = fileName.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+    
+    if (fileNameMatch) {
+      const [_, year, month, day, hour, minute] = fileNameMatch;
+      
+      // Criar data em UTC e aplicar ajustes
+      const utcDate = new Date(Date.UTC(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute)
+      ));
+      
+      const offsetMilliseconds = CONFIG.TIME_OFFSET * 60 * 60 * 1000;
+      const incrementMilliseconds = CONFIG.TIME_INCREMENT * 60 * 1000;
+      const localDate = new Date(utcDate.getTime() + offsetMilliseconds + incrementMilliseconds);
+      
+      // Formatar a data para exibição
+      return localDate.toISOString().replace('T', ' ').substring(0, 16);
+    }
+    
+    return null;
+  };
+
+  // Substituir ou adicionar a função updatePolygonChart ao escopo onde é usada
+  window.updatePolygonChart = updatePolygonChart;
+
+  // Adicionar div para o gráfico no HTML
+  const chartContainerOld = document.createElement("div");
+  chartContainerOld.id = "polygon-chart-container";
+  chartContainerOld.style.cssText = "position: absolute; bottom: 10px; right: 10px; width: 300px; height: 200px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 10px; display: none; z-index: 1000;";
+  
+  const chartTitleOld = document.createElement("h4");
+  chartTitleOld.style.cssText = "margin: 0 0 10px 0; font-size: 14px; text-align: center;";
+  chartTitleOld.textContent = "Polígono Selecionado";
+  
+  const chartCanvasOld = document.createElement("canvas");
+  chartCanvasOld.id = "polygon-chart";
+  chartCanvasOld.style.width = "100%";
+  chartCanvasOld.style.height = "150px";
+  
+  const closeButtonOld = document.createElement("button");
+  closeButtonOld.textContent = "×";
+  closeButtonOld.style.cssText = "position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 5px;";
+  closeButtonOld.addEventListener("click", () => {
+    chartContainerOld.style.display = "none";
+  });
+  
+  chartContainerOld.appendChild(closeButtonOld);
+  chartContainerOld.appendChild(chartTitleOld);
+  chartContainerOld.appendChild(chartCanvasOld);
+  document.body.appendChild(chartContainerOld);
+  
+  // Adicionar a biblioteca Chart.js
+  const chartScriptOld = document.createElement("script");
+  chartScriptOld.src = "https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js";
+  chartScriptOld.onload = function() {
+    console.log("Chart.js carregado com sucesso");
+  };
+  document.head.appendChild(chartScriptOld);
+  
+  // Variável para armazenar a instância do gráfico
+  let polygonChartOld = null;
+
+  // Função para criar ou atualizar o gráfico com os dados do polígono
+  const updatePolygonChartOld = (feature) => {
+    if (!feature || !feature.properties) return;
+    
+    const props = feature.properties;
+    const uid = props.uid || "N/A";
+    const size = props.size !== undefined ? parseFloat(props.size) : 0;
+    const min = props.min !== undefined ? parseFloat(props.min) : 0;
+    const max = props.max !== undefined ? parseFloat(props.max) : 0;
+    
+    chartTitleOld.textContent = `Polígono UID: ${uid}`;
+    
+    // Verificar se Chart.js está disponível
+    if (typeof Chart === "undefined") {
+      console.error("Chart.js não foi carregado ainda");
+      return;
+    }
+    
+    // Destruir gráfico anterior se existir
+    if (polygonChartOld) {
+      polygonChartOld.destroy();
+    }
+    
+    // Criar novo gráfico
+    polygonChartOld = new Chart(document.getElementById('polygon-chart'), {
+      type: 'bar',
+      data: {
+        labels: ['Size', 'Min', 'Max'],
+        datasets: [{
+          label: 'Valores',
+          data: [size, min, max],
+          backgroundColor: [
+            'rgba(54, 162, 235, 0.6)',
+            'rgba(75, 192, 192, 0.6)',
+            'rgba(255, 99, 132, 0.6)'
+          ],
+          borderColor: [
+            'rgb(54, 162, 235)',
+            'rgb(75, 192, 192)',
+            'rgb(255, 99, 132)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    
+    // Mostrar o container do gráfico
+    chartContainerOld.style.display = "block";
+  };
 
   // ============ INICIALIZAÇÃO DE UI ============
   const elements = {
@@ -299,6 +679,10 @@ document.addEventListener("DOMContentLoaded", () => {
             
             // Restaurar o estilo padrão
             layer.setStyle(CONFIG.STYLES.BOUNDARY);
+            
+            // Esconder o gráfico
+            document.getElementById('polygon-chart-container').style.display = "none";
+            
             updateMarkers(); // Atualiza os marcadores para mostrar todos
             return;
           }
@@ -315,6 +699,9 @@ document.addEventListener("DOMContentLoaded", () => {
           
           // Aplica estilo de destaque ao polígono selecionado
           layer.setStyle(CONFIG.STYLES.SELECTED);
+          
+          // Atualizar o gráfico com os dados do polígono selecionado
+          updatePolygonChart(feature);
           
           // Verifica se há opções de exibição ativas
           const hasActiveOptions = Object.values(state.displayOptions).some(val => val);
@@ -344,6 +731,8 @@ document.addEventListener("DOMContentLoaded", () => {
         state.selectedFeatureUid = null;
         state.selectedFeature = null;
         state.selectedLayer = null;
+        // Esconder o gráfico
+        document.getElementById('polygon-chart-container').style.display = "none";
         updateMarkers(); // Atualiza marcadores para mostrar todos conforme config global
       }
     });
@@ -732,6 +1121,8 @@ const selectPolygonByUid = (uid) => {
       state.selectedLayer = layer;
       // Aplicar estilo
       layer.setStyle(CONFIG.STYLES.SELECTED);
+      // Atualizar o gráfico com os dados do polígono
+      updatePolygonChart(layer.feature);
       found = true;
     }
   });
@@ -744,6 +1135,8 @@ const selectPolygonByUid = (uid) => {
     state.selectedFeatureUid = null;
     state.selectedFeature = null;
     state.selectedLayer = null;
+    // Esconder o gráfico
+    document.getElementById('polygon-chart-container').style.display = "none";
   }
   
   return found;
