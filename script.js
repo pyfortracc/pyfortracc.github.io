@@ -8,7 +8,7 @@
 
 // ============ CONFIGURAÇÕES E CONSTANTES ============
 const CONFIG = {
-  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_','expansion','inside_clusters'],
+  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_','expansion'],
   DEFAULT_THRESHOLD: "235.0",
   AUTO_CHECK_INTERVAL: 60000, // 60 segundos
   TIME_OFFSET: -3, // UTC-3 horas
@@ -507,7 +507,28 @@ document.addEventListener("DOMContentLoaded", () => {
    * Cria uma layer de trajetória a partir de um GeoJSON
    */
   const createTrajectoryLayer = geojson => L.geoJSON(geojson, {
-    filter: passesThreshold,
+    filter: feature => {
+      // Filtra apenas as trajetórias que correspondem aos UIDs dos polígonos visíveis
+      // e que passam pelo threshold atual
+      if (!feature.properties || !feature.properties.uid || !feature.properties.threshold) return false;
+  
+      // Verificar se o threshold corresponde ao filtro atual
+      const matchesThreshold = parseFloat(feature.properties.threshold) === parseFloat(state.currentThresholdFilter);
+      if (!matchesThreshold) return false;
+      
+      // Se há um polígono específico selecionado, mostra apenas sua trajetória
+      if (state.selection.uid) {
+        return feature.properties.uid === state.selection.uid;
+      }
+      
+      // Caso contrário, mostra trajetórias dos polígonos visíveis na camada atual
+      const currentBoundaryFeatures = state.geojsonLayers[state.currentIndex].geojson.features;
+      return currentBoundaryFeatures.some(boundaryFeature => 
+        boundaryFeature.properties && 
+        boundaryFeature.properties.uid === feature.properties.uid &&
+        passesThreshold(boundaryFeature)
+      );
+    },
     style: CONFIG.STYLES.TRAJECTORY
   });
 
@@ -905,9 +926,11 @@ document.addEventListener("DOMContentLoaded", () => {
       console.info("Fallback para GitHub raw URL para trajectory:", trajectoryUrl);
     }
     
+    // Remover qualquer layer de trajetória existente
+    removeTrajectoryLayer();
+    
     // Se já temos os dados da trajetória, apenas exibimos
     if (currentLayer.trajectoryGeojson) {
-      if (state.currentTrajectoryLayer) elements.map.removeLayer(state.currentTrajectoryLayer);
       state.currentTrajectoryLayer = createTrajectoryLayer(currentLayer.trajectoryGeojson);
       state.currentTrajectoryLayer.addTo(elements.map);
       currentLayer.trajectoryLayer = state.currentTrajectoryLayer;
