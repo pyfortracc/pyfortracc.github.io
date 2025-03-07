@@ -19,6 +19,7 @@ const CONFIG = {
   },
   MAP: {
     BOUNDS: [[-35.01807360131674, -79.99568018181952], [4.986926398683252, -30.000680181819533]],
+    DEFAULT_ZOOM: 4.4, // Nível de zoom padrão (valores maiores = mais zoom)
     TILE_LAYER: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     TILE_ATTRIBUTION: "© OpenStreetMap contributors"
   },
@@ -102,7 +103,15 @@ const utils = {
 document.addEventListener("DOMContentLoaded", () => {
   // ============ INICIALIZAÇÃO DE UI ============
   const elements = {
-    map: L.map("map").fitBounds(CONFIG.MAP.BOUNDS),
+    map: L.map("map", {
+      center: [
+        (CONFIG.MAP.BOUNDS[0][0] + CONFIG.MAP.BOUNDS[1][0]) / 2, 
+        (CONFIG.MAP.BOUNDS[0][1] + CONFIG.MAP.BOUNDS[1][1]) / 2
+      ],
+      zoom: CONFIG.MAP.DEFAULT_ZOOM,
+      zoomSnap: 0.1,  // Permite níveis de zoom com incrementos de 0.1
+      zoomDelta: 0.1  // Permite alteração do zoom em incrementos de 0.1
+    }),
     timelineSlider: document.getElementById("timeline"),
     prevBtn: document.getElementById("prevLayer"),
     playPauseBtn: document.getElementById("playPause"),
