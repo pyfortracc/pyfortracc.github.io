@@ -119,6 +119,35 @@ const utils = {
   }
 };
 
+/**
+ * Salva o estado atual da visualização do mapa
+ */
+const saveMapViewState = () => {
+  const mapCenter = elements.map.getCenter();
+  const mapZoom = elements.map.getZoom();
+  const viewState = {
+    center: [mapCenter.lat, mapCenter.lng],
+    zoom: mapZoom
+  };
+  
+  localStorage.setItem('mapViewState', JSON.stringify(viewState));
+};
+
+/**
+ * Restaura o estado da visualização do mapa
+ */
+const restoreMapViewState = () => {
+  const savedView = localStorage.getItem('mapViewState');
+  if (savedView) {
+    try {
+      const viewState = JSON.parse(savedView);
+      elements.map.setView(viewState.center, viewState.zoom);
+    } catch (e) {
+      console.error("Erro ao restaurar estado do mapa:", e);
+    }
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   // Adicione no início do DOMContentLoaded
   // Estilo para os popups de features
@@ -495,6 +524,17 @@ document.addEventListener("DOMContentLoaded", () => {
   // Na inicialização:
   elements.map.on('click', onMapClick);
 
+  // Na inicialização do mapa, após criar o objeto map:
+
+  // Adicionar eventos para salvar o estado da visualização
+  elements.map.on('moveend', saveMapViewState);
+  elements.map.on('zoomend', saveMapViewState);
+
+  // Adicionar após os event listeners do mapa:
+
+  // Salvar estado do mapa quando o usuário sai da página
+  window.addEventListener('beforeunload', saveMapViewState);
+
   // ============ GERENCIAMENTO DE LAYERS E MARKERS ============
   /**
    * Verifica se uma feature passa pelo filtro de limite
@@ -860,6 +900,11 @@ document.addEventListener("DOMContentLoaded", () => {
                   localStorage.removeItem('selectedSystemUid');
                 }, 500); // Pequeno atraso para garantir que a camada esteja completamente carregada
               }
+              
+              // Restaurar o estado da visualização do mapa após tudo estar carregado
+              setTimeout(() => {
+                restoreMapViewState();
+              }, 800); // Um atraso um pouco maior para garantir que tudo está pronto
             }
           });
       });
@@ -885,6 +930,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (state.selection.uid) {
           localStorage.setItem('selectedSystemUid', state.selection.uid);
         }
+        
+        // Salvar o estado da visualização do mapa
+        saveMapViewState();
         
         localStorage.setItem('boundaryFiles', JSON.stringify(files));
         location.reload();
