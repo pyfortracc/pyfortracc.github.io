@@ -1091,13 +1091,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const showLayerAtIndex = index => {
     if (index < 0 || index >= state.geojsonLayers.length) return;
     
+    // Salvar o UID atual antes de remover a camada
+    const currentSelectedUid = state.selection.uid;
+    
     removeCurrentLayer();
     state.currentIndex = index;
     updateBoundaryLayer();
     
-    // Se há um UID selecionado, tentar encontrar o polígono correspondente na nova camada
-    if (state.selection.uid) {
-      selectPolygonByUid(state.selection.uid);
+    // Se havia um polígono selecionado, tentar selecioná-lo novamente na nova camada
+    if (currentSelectedUid) {
+      // Restaurar a seleção do UID na nova camada
+      state.selection.uid = currentSelectedUid; // Manter o UID selecionado
+      
+      // Tentar encontrar o polígono na nova camada e aplicar estilo
+      let found = false;
+      state.currentBoundaryLayer.eachLayer(layer => {
+        if (layer.feature && 
+            layer.feature.properties && 
+            layer.feature.properties.uid === currentSelectedUid &&
+            passesThreshold(layer.feature)) {
+          
+          // Encontramos o polígono com o mesmo UID
+          state.selection.feature = layer.feature;
+          state.selection.layer = layer;
+          layer.setStyle(CONFIG.STYLES.SELECTED);
+          
+          // Atualizar o gráfico com os dados do polígono
+          updatePolygonChart(layer.feature);
+          found = true;
+        }
+      });
+      
+      // Se não encontrou o polígono nesta camada mas ainda queremos manter a seleção
+      if (!found) {
+        // Neste caso, o polígono não está presente nesta camada, 
+        // mas mantemos o UID para quando voltar a uma camada que o tenha
+        state.selection.feature = null;
+        state.selection.layer = null;
+        
+        // Esconder o gráfico porque o polígono não está presente nesta camada
+        document.getElementById(CONFIG.DOM_IDS.POLYGON_CHART_CONTAINER).style.display = "none";
+      }
     }
     
     updateMarkers();
