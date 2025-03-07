@@ -12,6 +12,7 @@ const CONFIG = {
   DEFAULT_THRESHOLD: "235.0",
   AUTO_CHECK_INTERVAL: 60000, // 60 segundos
   TIME_OFFSET: -3, // UTC-3 horas
+  TIME_INCREMENT: 10, // +10 minutos
   DIRECTORIES: {
     BOUNDARY: "track/boundary/",
     TRAJECTORY: "track/trajectory/"
@@ -151,10 +152,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const updateTimestampInfo = obj => {
     let ts = "";
     
+    // Debug do nome do arquivo
+    console.log("Processando arquivo:", obj.fileName);
+    
     // Extrair timestamp do nome do arquivo (formato: YYYYMMDD_HHMM)
     const fileNameMatch = obj.fileName.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+    
     if (fileNameMatch) {
       const [_, year, month, day, hour, minute] = fileNameMatch;
+      console.log(`Timestamp extraído: ${year}-${month}-${day} ${hour}:${minute}`);
       
       // Criar data em UTC
       const utcDate = new Date(Date.UTC(
@@ -165,29 +171,44 @@ document.addEventListener("DOMContentLoaded", () => {
         parseInt(minute)
       ));
       
-      // Ajustar para UTC-3
-      const localDate = new Date(utcDate.getTime() + (CONFIG.TIME_OFFSET * 60 * 60 * 1000));
+      // Ajustar para UTC-3 e adicionar o incremento de 10 minutos
+      const offsetMilliseconds = CONFIG.TIME_OFFSET * 60 * 60 * 1000; // -3 horas em milissegundos
+      const incrementMilliseconds = CONFIG.TIME_INCREMENT * 60 * 1000; // +10 minutos em milissegundos
+      const localDate = new Date(utcDate.getTime() + offsetMilliseconds + incrementMilliseconds);
       
       // Formatar a data
-      const formattedDate = localDate.toISOString().replace('T', ' ').substring(0, 16);
-      ts = formattedDate;
+      ts = localDate.toISOString().replace('T', ' ').substring(0, 16);
+      console.log(`Timestamp formatado: ${ts}`);
     } else {
+      console.log("Nenhum timestamp encontrado no nome do arquivo, tentando GeoJSON");
       // Fallback: tentar obter do GeoJSON se a extração do nome do arquivo falhar
-      if (obj.geojson.features && obj.geojson.features.length > 0) {
+      if (obj.geojson && obj.geojson.features && obj.geojson.features.length > 0) {
         ts = obj.geojson.features[0].timestamp ||
              (obj.geojson.features[0].properties && obj.geojson.features[0].properties.timestamp) || "";
         
-        // Aplicar offset se timestamp estiver presente
+        console.log(`Timestamp do GeoJSON: ${ts}`);
+        
+        // Aplicar offset e incremento se timestamp estiver presente
         if (ts) {
           const date = new Date(ts);
-          date.setTime(date.getTime() + (CONFIG.TIME_OFFSET * 60 * 60 * 1000));
+          // Aplicar ajuste de fuso horário e incremento de minutos
+          date.setTime(date.getTime() + (CONFIG.TIME_OFFSET * 60 * 60 * 1000) + (CONFIG.TIME_INCREMENT * 60 * 1000));
           ts = date.toISOString().replace('T', ' ').substring(0, 16);
+          console.log(`Timestamp ajustado: ${ts}`);
         }
+      } else {
+        console.log("Nenhum timestamp encontrado no GeoJSON");
       }
     }
     
     if (elements.trackInfo) {
-      elements.trackInfo.textContent = `Track: ${ts} (UTC${CONFIG.TIME_OFFSET})`;
+      if (ts) {
+        elements.trackInfo.textContent = `Track: ${ts} (UTC${CONFIG.TIME_OFFSET})`;
+      } else {
+        elements.trackInfo.textContent = "Track: Sem dados de timestamp";
+      }
+    } else {
+      console.error("Elemento trackInfo não encontrado");
     }
   };
 
