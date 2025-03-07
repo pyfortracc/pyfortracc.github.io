@@ -186,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /// Modificar o container do gráfico para ficar no topo direito com tamanho reduzido
   const chartContainer = document.createElement("div");
   chartContainer.id = "polygon-chart-container";
-  chartContainer.style.cssText = "position: absolute; top: 10px; right: 10px; width: 300px; height: 290px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 10px; display: none; z-index: 1000;";
+  chartContainer.style.cssText = "position: absolute; top: 10px; right: 10px; width: 300px; height: 250px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 25px; display: none; z-index: 1000;";
   
   const chartTitle = document.createElement("h4");
   chartTitle.style.cssText = "margin: 0 0 10px 0; font-size: 14px; text-align: center;";
