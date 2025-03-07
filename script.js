@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
       checkbox.checked = false;
       checkbox.addEventListener("change", updateDisplayOptions);
       label.appendChild(checkbox);
-      label.appendChild(document.createTextNode("->" + field));
+      label.appendChild(document.createTextNode("" + field));
       container.appendChild(label);
       dynamicOptionsContainer.appendChild(container);
     });
@@ -167,33 +167,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadBoundaryLayers = () => {
     fetchBoundaryFileList().then(files => {
       if (!files.length) throw new Error("Nenhum arquivo .geojson encontrado para boundary");
-      let loadedCount = 0;
-      files.forEach(file => {
-        fetch(file.download_url)
-          .then(r => { if (!r.ok) throw new Error(file.download_url); return r.json(); })
-          .then(geojson => geojsonLayers.push({
-            fileName: file.name,
-            geojson,
-            trajectoryLayer: null,
-            trajectoryGeojson: null
-          }))
-          .catch(err => console.error(err))
-          .finally(() => {
-            loadedCount++;
-            if (loadedCount === files.length && geojsonLayers.length > 0) {
-              // Ordena os layers pelo nome
-              geojsonLayers.sort((a, b) => a.fileName.toLowerCase().localeCompare(b.fileName.toLowerCase()));
-              timelineSlider.disabled = false;
-              timelineSlider.min = 0;
-              timelineSlider.max = geojsonLayers.length - 1;
-              timelineSlider.value = 0;
-              showLayerAtIndex(0);
-              playing = true;
-              playPauseBtn.textContent = "Pause";
-              updatePlayInterval();
-            }
-          });
-      });
+
+      // Obter a lista de arquivos de boundary armazenada anteriormente
+      const storedFiles = JSON.parse(localStorage.getItem('boundaryFiles')) || [];
+
+      // Verificar se há novos arquivos
+      const newFiles = files.filter(file => !storedFiles.some(storedFile => storedFile.name === file.name));
+
+      if (newFiles.length > 0) {
+        // Atualizar a lista de arquivos armazenada
+        localStorage.setItem('boundaryFiles', JSON.stringify(files));
+
+        // Recarregar a página se houver novos arquivos
+        location.reload();
+      } else {
+        let loadedCount = 0;
+        files.forEach(file => {
+          fetch(file.download_url)
+            .then(r => { if (!r.ok) throw new Error(file.download_url); return r.json(); })
+            .then(geojson => geojsonLayers.push({
+              fileName: file.name,
+              geojson,
+              trajectoryLayer: null,
+              trajectoryGeojson: null
+            }))
+            .catch(err => console.error(err))
+            .finally(() => {
+              loadedCount++;
+              if (loadedCount === files.length && geojsonLayers.length > 0) {
+                // Ordena os layers pelo nome
+                geojsonLayers.sort((a, b) => a.fileName.toLowerCase().localeCompare(b.fileName.toLowerCase()));
+                timelineSlider.disabled = false;
+                timelineSlider.min = 0;
+                timelineSlider.max = geojsonLayers.length - 1;
+                timelineSlider.value = geojsonLayers.length - 1; // Define o slider para o último índice
+                showLayerAtIndex(geojsonLayers.length - 1); // Mostra a última camada
+                playing = false; // Desativa a reprodução automática
+                playPauseBtn.textContent = "Play";
+              }
+            });
+        });
+      }
     }).catch(console.error);
   };
   
