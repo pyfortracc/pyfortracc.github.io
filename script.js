@@ -1,8 +1,11 @@
 const CONFIG_DISPLAY_KEYS = ['uid', 'status', 'size', 'min', 'ang_'];
 const REPO_RAW_URL = "https://raw.githubusercontent.com/fortracc/fortracc.github.io/main/";
 const LOCAL_BOUNDARY_DIR = "track/boundary/", LOCAL_TRAJECTORY_DIR = "track/trajectory/";
-const GITHUB_BOUNDARY_API = "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/boundary?ref=main";
-const GITHUB_TRAJECTORY_API = "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/trajectory?ref=main";
+// const GITHUB_BOUNDARY_API = "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/boundary?ref=main";
+// const GITHUB_TRAJECTORY_API = "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/trajectory?ref=main";
+
+const GITHUB_BOUNDARY_API = "";
+const GITHUB_TRAJECTORY_API = "";
 
 let geojsonLayers = [], trajectoryFiles = {}, currentIndex = 0, playing = false, playInterval = null;
 let currentThresholdFilter = "235.0", currentBoundaryLayer = null, currentTrajectoryLayer = null;
