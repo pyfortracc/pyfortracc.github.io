@@ -1,0 +1,16 @@
+{
+"type": "FeatureCollection",
+"name": "20250307_1240",
+"features": [
+{ "type": "Feature", "properties": { "cindex": 1, "timestamp": "2025-03-07 12:40:00", "uid": 1.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 2, "timestamp": "2025-03-07 12:40:00", "uid": 2.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 3, "timestamp": "2025-03-07 12:40:00", "uid": 3.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 4, "timestamp": "2025-03-07 12:40:00", "uid": 4.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 5, "timestamp": "2025-03-07 12:40:00", "uid": 5.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 6, "timestamp": "2025-03-07 12:40:00", "uid": 6.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 7, "timestamp": "2025-03-07 12:40:00", "uid": 7.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 8, "timestamp": "2025-03-07 12:40:00", "uid": 8.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 9, "timestamp": "2025-03-07 12:40:00", "uid": 9.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } },
+{ "type": "Feature", "properties": { "cindex": 10, "timestamp": "2025-03-07 12:40:00", "uid": 10.0, "iuid": null, "status": "NEW", "threshold": 235.0, "trajectory": "LINESTRING EMPTY" }, "geometry": { "type": "LineString", "coordinates": [ ] } }
+]
+}
