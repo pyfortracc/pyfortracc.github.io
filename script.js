@@ -51,8 +51,8 @@ const CONFIG = {
     SELECTED: { color: "#FF00FF", weight: 3, opacity: 1, fillOpacity: 0.3 } // Estilo para polígono selecionado
   },
   GITHUB: {
-    BOUNDARY_API: "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/boundary/",
-    TRAJECTORY_API: "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/trajectory/"
+    BOUNDARY_API: "https://api.github.com/repos/pyfortracc/pyfortracc.github.io/contents/track/boundary/",
+    TRAJECTORY_API: "https://api.github.com/repos/pyfortracc/pyfortracc.github.io/contents/track/trajectory/"
   },
   CHART: {
     EVOLUTION_VARIABLES: ['size', 'min', 'expansion','inside_clusters'], // Variáveis que podem ser exibidas no gráfico de evolução
