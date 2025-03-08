@@ -384,9 +384,23 @@ document.addEventListener("DOMContentLoaded", () => {
         parseFloat(core.elements.speedInput.value) : 2;
         
       core.state.playInterval = setInterval(() => {
+        // Preserve trajectory display state while playing
+        const showTrajectoryCheckbox = core.elements && core.elements.showTrajectoryCheckbox;
+        const trajectoryWasShowing = showTrajectoryCheckbox ? showTrajectoryCheckbox.checked : false;
+        
+        // Advance to next frame
         let next = core.state.currentIndex + 1;
         if (next >= core.state.geojsonLayers.length) next = 0;
+        
+        // Update the displayed layer
         window.mapUtils.showLayerAtIndex(next);
+        
+        // Ensure trajectory display reflects checkbox state after layer change
+        if (trajectoryWasShowing && core.elements.showTrajectoryCheckbox) {
+          // Ensure trajectory visibility when timeline advances
+          core.elements.showTrajectoryCheckbox.checked = true;
+          window.mapUtils.loadTrajectoryForCurrentLayer();
+        }
       }, speed * 1000);
     }
   };

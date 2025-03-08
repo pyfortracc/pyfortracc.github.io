@@ -555,6 +555,8 @@ const chartModule = (() => {
     let offsetX = 0;
     let offsetY = 0;
     let isDragging = false;
+    let initialX = 0;
+    let initialY = 0;
     
     // Find or create drag handle (using the header)
     const dragHandle = element.querySelector('.header-with-controls');
@@ -577,42 +579,54 @@ const chartModule = (() => {
       e.preventDefault();
       isDragging = true;
       
-      // Get current transformation or default to 0,0
-      let transform = element.style.transform || "";
-      let translateX = 0;
-      let translateY = 0;
+      // Get the current position from transform or default to 0,0
+      let currentX = 0;
+      let currentY = 0;
       
+      const transform = element.style.transform || "";
       const match = transform.match(/translate\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/);
       if (match) {
-        translateX = parseFloat(match[1]);
-        translateY = parseFloat(match[2]);
+        currentX = parseFloat(match[1]);
+        currentY = parseFloat(match[2]);
       }
       
-      // Calculate offset based on current mouse position and element position
-      offsetX = e.clientX - (element.getBoundingClientRect().left - translateX);
-      offsetY = e.clientY - (element.getBoundingClientRect().top - translateY);
+      // Record starting mouse position
+      initialX = e.clientX;
+      initialY = e.clientY;
+      
+      // Store current element position as offset
+      offsetX = currentX;
+      offsetY = currentY;
       
       // Add dragging class to show visual feedback
       element.classList.add('dragging');
+      
+      // Debug info
+      console.log(`Drag started at mouse (${initialX}, ${initialY}), element offset (${offsetX}, ${offsetY})`);
     }
     
     function startDragTouch(e) {
       if (e.touches.length === 1) {
         const touch = e.touches[0];
         
-        let transform = element.style.transform || "";
-        let translateX = 0;
-        let translateY = 0;
+        // Get the current position from transform or default to 0,0
+        let currentX = 0;
+        let currentY = 0;
         
+        const transform = element.style.transform || "";
         const match = transform.match(/translate\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/);
         if (match) {
-          translateX = parseFloat(match[1]);
-          translateY = parseFloat(match[2]);
+          currentX = parseFloat(match[1]);
+          currentY = parseFloat(match[2]);
         }
         
-        // Calculate offset for touch
-        offsetX = touch.clientX - (element.getBoundingClientRect().left - translateX);
-        offsetY = touch.clientY - (element.getBoundingClientRect().top - translateY);
+        // Record starting touch position
+        initialX = touch.clientX;
+        initialY = touch.clientY;
+        
+        // Store current element position as offset
+        offsetX = currentX;
+        offsetY = currentY;
         
         isDragging = true;
         element.classList.add('dragging');
@@ -623,10 +637,15 @@ const chartModule = (() => {
       if (!isDragging) return;
       e.preventDefault();
       
-      const x = e.clientX - offsetX;
-      const y = e.clientY - offsetY;
+      // Calculate how far we've moved from the initial position
+      const deltaX = e.clientX - initialX;
+      const deltaY = e.clientY - initialY;
       
-      // Keep chart within viewport bounds, but ensure at least 30% of the element remains visible
+      // Apply the delta to the original position
+      const newX = offsetX + deltaX;
+      const newY = offsetY + deltaY;
+      
+      // Keep chart within viewport bounds
       const elementWidth = element.offsetWidth;
       const elementHeight = element.offsetHeight;
       
@@ -637,13 +656,17 @@ const chartModule = (() => {
       const maxVisibleY = window.innerHeight - elementHeight * 0.2;
       
       // Bound the position
-      const boundX = Math.max(minVisibleX, Math.min(x, maxVisibleX));
-      const boundY = Math.max(minVisibleY, Math.min(y, maxVisibleY));
+      const boundX = Math.max(minVisibleX, Math.min(newX, maxVisibleX));
+      const boundY = Math.max(minVisibleY, Math.min(newY, maxVisibleY));
       
+      // Apply the new position
       element.style.transform = `translate(${boundX}px, ${boundY}px)`;
       
       // Save position while dragging for smooth experience
       saveChartPosition(boundX, boundY);
+      
+      // Debug
+      // console.log(`Drag: delta (${deltaX}, ${deltaY}), new pos (${boundX}, ${boundY})`);
     }
     
     function dragTouch(e) {
@@ -651,10 +674,16 @@ const chartModule = (() => {
       e.preventDefault();
       
       const touch = e.touches[0];
-      const x = touch.clientX - offsetX;
-      const y = touch.clientY - offsetY;
       
-      // Keep chart within viewport bounds, but ensure at least 30% of the element remains visible
+      // Calculate how far we've moved from the initial position
+      const deltaX = touch.clientX - initialX;
+      const deltaY = touch.clientY - initialY;
+      
+      // Apply the delta to the original position
+      const newX = offsetX + deltaX;
+      const newY = offsetY + deltaY;
+      
+      // Keep chart within viewport bounds
       const elementWidth = element.offsetWidth;
       const elementHeight = element.offsetHeight;
       
@@ -665,9 +694,10 @@ const chartModule = (() => {
       const maxVisibleY = window.innerHeight - elementHeight * 0.2;
       
       // Bound the position
-      const boundX = Math.max(minVisibleX, Math.min(x, maxVisibleX));
-      const boundY = Math.max(minVisibleY, Math.min(y, maxVisibleY));
+      const boundX = Math.max(minVisibleX, Math.min(newX, maxVisibleX));
+      const boundY = Math.max(minVisibleY, Math.min(newY, maxVisibleY));
       
+      // Apply the new position
       element.style.transform = `translate(${boundX}px, ${boundY}px)`;
       
       // Save position while dragging for smooth experience
@@ -676,6 +706,8 @@ const chartModule = (() => {
     
     function stopDrag() {
       if (!isDragging) return;
+      
+      // Clean up
       isDragging = false;
       element.classList.remove('dragging');
       
@@ -714,6 +746,9 @@ const chartModule = (() => {
           element.style.transform = `translate(${adjustedX}px, ${adjustedY}px)`;
           saveChartPosition(adjustedX, adjustedY);
         }
+        
+        // Log for debugging
+        console.log(`Drag ended. Final position: (${finalX}, ${finalY})`);
       }
     }
   };

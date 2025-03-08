@@ -230,8 +230,16 @@ const utils = {
 
   /**
    * Extract base name from a file path
+   * @param {string} fileName - Full file path or filename
+   * @returns {string} The base filename without path and extension
    */
-  getBaseName: fileName => fileName.split('/').pop(),
+  getBaseName: fileName => {
+    // Remove path if present (works for both / and \ paths)
+    const fileNameOnly = fileName.split(/[\/\\]/).pop();
+    
+    // Remove extension
+    return fileNameOnly.replace(/\.[^.]*$/, '');
+  },
 
   /**
    * Format timestamp for display with timezone offset

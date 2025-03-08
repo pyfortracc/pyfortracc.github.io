@@ -519,7 +519,20 @@ const mapUtils = (() => {
     // Save current UID before removing layer
     const currentSelectedUid = core.state.selection.uid;
     
-    removeCurrentLayer();
+    // Save current trajectory state
+    const showTrajectoryCheckbox = core.elements && core.elements.showTrajectoryCheckbox;
+    const showTrajectory = showTrajectoryCheckbox ? showTrajectoryCheckbox.checked : false;
+    
+    // Only remove the boundary layer, keeping trajectory if enabled
+    if (core.state.currentBoundaryLayer) { 
+      _map.removeLayer(core.state.currentBoundaryLayer); 
+      core.state.currentBoundaryLayer = null;
+    }
+    
+    if (markerGroup) {
+      markerGroup.clearLayers();
+    }
+    
     core.state.currentIndex = index;
     updateBoundaryLayer();
     
@@ -562,11 +575,7 @@ const mapUtils = (() => {
     window.viewOptions.updateMarkers();
     updateTimestampInfo(core.state.geojsonLayers[core.state.currentIndex]);
     
-    // Update trajectory display if enabled
-    // Fixed: Added safety check for showTrajectoryCheckbox before accessing checked property
-    const showTrajectoryCheckbox = core.elements && core.elements.showTrajectoryCheckbox;
-    const showTrajectory = showTrajectoryCheckbox ? showTrajectoryCheckbox.checked : false;
-    
+    // If trajectory was showing, update it for the new layer
     if (showTrajectory) {
       loadTrajectoryForCurrentLayer();
     }
@@ -586,43 +595,67 @@ const mapUtils = (() => {
     if (!currentLayer) return;
     
     const baseName = core.utils.getBaseName(currentLayer.fileName);
-    let trajectoryUrl = core.state.trajectoryFiles[baseName] ||
-      Object.keys(core.state.trajectoryFiles).find(k => 
+    
+    // Find the exact matching trajectory file by basic filename match
+    let trajectoryUrl = null;
+    
+    // First try exact match - key equals basename
+    if (core.state.trajectoryFiles[baseName]) {
+      trajectoryUrl = core.state.trajectoryFiles[baseName];
+    } else {
+      // Then try to find a case-insensitive match
+      const matchingKey = Object.keys(core.state.trajectoryFiles).find(k => 
         k.toLowerCase() === baseName.toLowerCase()
       );
+      if (matchingKey) {
+        trajectoryUrl = core.state.trajectoryFiles[matchingKey];
+      }
+    }
     
+    // If not found yet, construct the likely URL based on naming convention
     if (!trajectoryUrl) {
-      // Fallback to GitHub raw URL
       trajectoryUrl = core.CONFIG.DIRECTORIES.TRAJECTORY + baseName;
-      console.info("Fallback to GitHub raw URL for trajectory:", trajectoryUrl);
+      console.info(`No trajectory found in loaded files. Fallback to constructed URL: ${trajectoryUrl}`);
     }
     
     // Remove any existing trajectory layer
     removeTrajectoryLayer();
     
-    // If we already have trajectory data, just display it
+    // If we already have trajectory data for this layer, just display it
     if (currentLayer.trajectoryGeojson) {
+      console.log(`Using cached trajectory data for ${baseName}`);
       core.state.currentTrajectoryLayer = createTrajectoryLayer(currentLayer.trajectoryGeojson);
       core.state.currentTrajectoryLayer.addTo(_map);
       currentLayer.trajectoryLayer = core.state.currentTrajectoryLayer;
       return;
     }
     
+    console.log(`Fetching trajectory data from ${trajectoryUrl}`);
+    
     // Otherwise, load the data
     fetch(trajectoryUrl)
       .then(r => { 
-        if (!r.ok) throw new Error(trajectoryUrl); 
+        if (!r.ok) {
+          console.warn(`HTTP error ${r.status} loading trajectory from ${trajectoryUrl}`);
+          throw new Error(`Failed to load trajectory from ${trajectoryUrl} (${r.status})`); 
+        }
         return r.json(); 
       })
       .then(geojson => {
+        // Store trajectory data with the layer for future use
         currentLayer.trajectoryGeojson = geojson;
+        
+        // Create and add the trajectory layer
         core.state.currentTrajectoryLayer = createTrajectoryLayer(geojson);
         core.state.currentTrajectoryLayer.addTo(_map);
         currentLayer.trajectoryLayer = core.state.currentTrajectoryLayer;
+        
+        console.log(`Successfully loaded and displayed trajectory for ${baseName}`);
       })
       .catch(err => { 
-        console.error("Error loading trajectory:", err); 
-        // Fixed: Add safety check before setting checked property
+        console.error(`Error loading trajectory for ${baseName}:`, err);
+        
+        // Uncheck the trajectory checkbox on error
         if (core.elements.showTrajectoryCheckbox) {
           core.elements.showTrajectoryCheckbox.checked = false;
         }
@@ -772,12 +805,73 @@ const mapUtils = (() => {
    * Load trajectory files
    */
   const loadTrajectoryFiles = () => {
+    console.log("Loading trajectory files...");
+    
     core.fetchTrajectoryFileList()
       .then(filesMap => {
         core.state.trajectoryFiles = filesMap;
+        console.log(`Successfully loaded ${Object.keys(filesMap).length} trajectory files`);
+        console.log("Trajectory files:", Object.keys(filesMap));
+        
+        // Pre-associate trajectories with their boundary layers if already loaded
+        if (core.state.geojsonLayers && core.state.geojsonLayers.length > 0) {
+          console.log("Pre-caching trajectories for existing boundary layers...");
+          
+          // Start loading trajectories for each layer to populate cache
+          core.state.geojsonLayers.forEach(layer => {
+            // Don't wait for completion - this is background loading
+            preloadTrajectoryForLayer(layer);
+          });
+        }
       })
       .catch(err => {
         console.error("Error loading trajectory files:", err);
+      });
+  };
+
+  /**
+   * Preload trajectory for a boundary layer to populate cache
+   * @param {Object} layer - Layer object with fileName property
+   */
+  const preloadTrajectoryForLayer = (layer) => {
+    if (!layer || !layer.fileName) return;
+    
+    const baseName = core.utils.getBaseName(layer.fileName);
+    
+    // Skip if already cached
+    if (layer.trajectoryGeojson) return;
+    
+    // Find matching trajectory file
+    let trajectoryUrl = null;
+    
+    // Try exact match
+    if (core.state.trajectoryFiles[baseName]) {
+      trajectoryUrl = core.state.trajectoryFiles[baseName];
+    } else {
+      // Try case-insensitive match
+      const matchingKey = Object.keys(core.state.trajectoryFiles).find(k => 
+        k.toLowerCase() === baseName.toLowerCase()
+      );
+      if (matchingKey) {
+        trajectoryUrl = core.state.trajectoryFiles[matchingKey];
+      }
+    }
+    
+    // If not found, construct the likely URL (this is for backup only)
+    if (!trajectoryUrl) {
+      trajectoryUrl = core.CONFIG.DIRECTORIES.TRAJECTORY + baseName;
+    }
+    
+    // Fetch and cache trajectory data in background
+    fetch(trajectoryUrl)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(geojson => {
+        layer.trajectoryGeojson = geojson;
+        console.log(`Pre-cached trajectory for ${baseName}`);
+      })
+      .catch(err => {
+        // Just log error - this is background loading
+        console.warn(`Could not pre-cache trajectory for ${baseName}:`, err);
       });
   };
   

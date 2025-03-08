@@ -242,9 +242,30 @@ const viewOptions = (() => {
     }
     
     if (showTrajectoryCheckbox && showTrajectoryCheckbox.checked) {
+      // When enabling trajectories
+      console.log("ViewOptions: Enabling trajectory display");
+      
+      // Check if selection exists to ensure proper filtering
+      if (core.state.selection.uid) {
+        console.log(`ViewOptions: Showing trajectory for selected UID: ${core.state.selection.uid}`);
+      } else {
+        console.log("ViewOptions: Showing trajectories for all visible systems");
+      }
+      
       window.mapUtils.loadTrajectoryForCurrentLayer();
-    } else if (window.mapUtils.removeTrajectoryLayer) {
-      window.mapUtils.removeTrajectoryLayer();
+      
+      // Save preference
+      localStorage.setItem('showTrajectory', 'true');
+    } else {
+      // When disabling trajectories
+      console.log("ViewOptions: Disabling trajectory display");
+      
+      if (window.mapUtils.removeTrajectoryLayer) {
+        window.mapUtils.removeTrajectoryLayer();
+      }
+      
+      // Save preference
+      localStorage.setItem('showTrajectory', 'false');
     }
   };
 
