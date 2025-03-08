@@ -51,9 +51,8 @@ const CONFIG = {
     SELECTED: { color: "#FF00FF", weight: 3, opacity: 1, fillOpacity: 0.3 } // Estilo para polígono selecionado
   },
   GITHUB: {
-    RAW_URL: "https://raw.githubusercontent.com/fortracc/fortracc.github.io/main/",
-    BOUNDARY_API: "",
-    TRAJECTORY_API: ""
+    BOUNDARY_API: "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/boundary/",
+    TRAJECTORY_API: "https://api.github.com/repos/fortracc/fortracc.github.io/contents/track/trajectory/"
   },
   CHART: {
     EVOLUTION_VARIABLES: ['size', 'min', 'expansion','inside_clusters'], // Variáveis que podem ser exibidas no gráfico de evolução
@@ -1182,7 +1181,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (!trajectoryUrl) {
       // Fallback para a URL raw do GitHub
-      trajectoryUrl = CONFIG.GITHUB.RAW_URL + CONFIG.DIRECTORIES.TRAJECTORY + baseName;
+      trajectoryUrl = CONFIG.DIRECTORIES.TRAJECTORY + baseName;
       console.info("Fallback para GitHub raw URL para trajectory:", trajectoryUrl);
     }
     
@@ -1215,7 +1214,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   };
 
-  // ============ CONTROLES DE UI E INTERAÇÃO ============
   /**
    * Gera opções de campos para exibição
    */
