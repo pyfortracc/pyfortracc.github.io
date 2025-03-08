@@ -1,97 +1,470 @@
 html,
-      body,
-      #map {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
-      /* Caixa com o timestamp exibido na parte superior centralizada */
-      #timestamp-info {
-        position: absolute;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-family: sans-serif;
-      }
-      /* Caixa de controles (player) posicionada na parte inferior centralizada */
-      #controls {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 10px;
-        width: 300px;
-        border-radius: 5px;
-        box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
-        font-family: sans-serif;
-        text-align: center;
-      }
-      /* Caixa para os controles de exibição dos campos, trajectory e threshold, posicionada à direita centralizada verticalmente */
-      #info-panel {
-        position: absolute;
-        right: 20px;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 1000;
-        background: rgba(255,255,255,0.9);
-        padding: 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 6px rgba(0,0,0,0.3);
-        font-family: sans-serif;
-        max-width: 220px;
-      }
-      #info-panel h3 {
-        margin-top: 0;
-        font-size: 1em;
-        text-align: center;
-      }
-      /* Controles dinâmicos criados para cada campo */
-      .field-option {
-        margin-bottom: 8px;
-      }
-      .field-option label {
-        font-size: 0.9em;
-      }
-      /* Controle do slider para navegação entre os slides */
-      #slider-container {
-        margin: 10px 0;
-      }
-      #timeline {
-        width: 100%;
-      }
-      /* Estilo dos botões do player */
-      #player-controls {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      #player-controls button {
-        flex: 1;
-        margin: 0 4px;
-      }
-      /* Controle de velocidade */
-      #speed-label {
-        font-size: 0.9em;
-        margin-top: 5px;
-      }
-      /* Estilo do tooltip dos centroides */
-      .centroid-tooltip {
-        background-color: #fff;
-        border: 1px solid #ccc;
-        padding: 4px;
-        font-size: 0.85em;
-      }
-      /* Estilo para a seção de filtro de threshold */
-      .filter-option {
-        margin-top: 12px;
-      }
-      .filter-option label {
-        font-size: 0.9em;
-        margin-right: 10px;
-      }
+body,
+#map {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  color: #f0f0f0;
+  font-family: sans-serif;
+}
+
+/* Caixa com o timestamp exibido na parte superior centralizada */
+#timestamp-info {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(30, 30, 30, 0.85);
+  color: #f0f0f0;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-family: sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Caixa de controles (player) posicionada na parte inferior centralizada */
+#controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(35, 35, 35, 0.85);
+  color: #f0f0f0;
+  padding: 10px;
+  width: 300px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-family: sans-serif;
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+
+/* Caixa para os controles de exibição dos campos, trajectory e threshold, posicionada à direita centralizada verticalmente */
+#info-panel {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  background: rgba(35, 35, 35, 0.85);
+  color: #f0f0f0;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-family: sans-serif;
+  max-width: 220px;
+  backdrop-filter: blur(3px);
+}
+
+#info-panel h3 {
+  margin-top: 0;
+  font-size: 1em;
+  text-align: center;
+  color: #f0f0f0;
+}
+
+/* Controles dinâmicos criados para cada campo */
+.field-option {
+  margin-bottom: 8px;
+  color: #e0e0e0;
+}
+
+.field-option label {
+  font-size: 0.9em;
+  color: #e0e0e0;
+}
+
+/* Controle do slider para navegação entre os slides */
+#slider-container {
+  margin: 10px 0;
+}
+
+#timeline {
+  width: 100%;
+  background: rgba(60, 60, 60, 0.5);
+  height: 8px;
+  -webkit-appearance: none;
+  border-radius: 4px;
+  outline: none;
+}
+
+/* Modificando o estilo da trilha para visualizar o progresso */
+#timeline::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #00c853 0%, #00c853 var(--progress, 0%), rgba(60, 60, 60, 0.5) var(--progress, 0%));
+  height: 8px;
+  border-radius: 4px;
+}
+
+#timeline::-moz-range-track {
+  background: linear-gradient(to right, #00c853 0%, #00c853 var(--progress, 0%), rgba(60, 60, 60, 0.5) var(--progress, 0%));
+  height: 8px;
+  border-radius: 4px;
+}
+
+#timeline::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border: 2px solid #00c853;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -4px; /* para centralizar verticalmente */
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+#timeline::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border: 2px solid #4d90fe;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Estilo dos botões do player */
+#player-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#player-controls button {
+  flex: 1;
+  margin: 0 4px;
+  background-color: rgba(60, 60, 60, 0.8);
+  color: #f0f0f0;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+#player-controls button:hover {
+  background-color: rgba(80, 80, 80, 0.9);
+}
+
+/* Controle de velocidade */
+#speed-label {
+  font-size: 0.9em;
+  margin-top: 5px;
+  color: #e0e0e0;
+}
+
+#speed {
+  background: rgba(60, 60, 60, 0.5);
+  height: 6px;
+  -webkit-appearance: none;
+  border-radius: 3px;
+  outline: none;
+}
+
+/* Modificando o estilo da trilha para visualizar o progresso */
+#speed::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #9e9e9e 0%, #9e9e9e var(--speed-progress, 0%), rgba(60, 60, 60, 0.5) var(--speed-progress, 0%));
+  height: 6px;
+  border-radius: 3px;
+}
+
+#speed::-moz-range-track {
+  background: linear-gradient(to right, #9e9e9e 0%, #9e9e9e var(--speed-progress, 0%), rgba(60, 60, 60, 0.5) var(--speed-progress, 0%));
+  height: 6px;
+  border-radius: 3px;
+}
+
+#speed::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid #9e9e9e;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -4px; /* para centralizar verticalmente */
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+#speed::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid #9e9e9e;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Estilo do tooltip dos centroides */
+.centroid-tooltip {
+  background-color: rgba(40, 40, 40, 0.9);
+  color: #f0f0f0;
+  border: 1px solid #555;
+  padding: 4px;
+  font-size: 0.85em;
+  border-radius: 3px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Estilo para a seção de filtro de threshold */
+.filter-option {
+  margin-top: 12px;
+  color: #e0e0e0;
+}
+
+.filter-option label {
+  font-size: 0.9em;
+  margin-right: 10px;
+  color: #e0e0e0;
+}
+
+/* Estilo para o gráfico */
+#polygon-chart-container {
+  background: rgba(35, 35, 35, 0.85) !important;
+  color: #f0f0f0 !important;
+  border-radius: 5px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+/* Adicione este estilo para o botão de fechar */
+#polygon-chart-container button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 5px;
+  color: #f0f0f0; /* Cor clara para combinar com o tema escuro */
+  transition: color 0.2s, transform 0.2s;
+}
+
+#polygon-chart-container button:hover {
+  color: #ffffff;
+  transform: scale(1.2);
+}
+
+/* Estilo para inputs de radio e checkbox */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #4d90fe;
+}
+
+/* Estilo para leaflet popups */
+.leaflet-popup-content-wrapper {
+  background: rgba(35, 35, 35, 0.9);
+  color: #f0f0f0;
+  border-radius: 5px;
+}
+
+.leaflet-popup-tip {
+  background: rgba(35, 35, 35, 0.9);
+}
+
+.feature-popup {
+  color: #f0f0f0;
+}
+
+.feature-popup strong {
+  color: #e0e0e0;
+}
+
+/* Estilizar seletor de variáveis */
+#variable-selector {
+  background-color: rgba(50, 50, 50, 0.8);
+  color: #f0f0f0;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: 4px;
+}
+
+/* Estilo para o container do gráfico */
+#polygon-chart-container {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 320px;
+  height: auto; /* Permitir altura automática baseada no conteúdo */
+  max-height: 280px; /* Altura máxima para evitar que fique muito grande */
+  background: rgba(35, 35, 35, 0.9) !important;
+  color: #f0f0f0 !important;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  padding: 15px;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+  display: none;
+}
+
+#polygon-chart-container h4 {
+  margin: 0;
+  flex-grow: 1;
+  font-size: 14px;
+  text-align: center;
+  color: #f0f0f0;
+}
+
+/* Estilo para os popups de features */
+.feature-popup {
+  padding: 5px;
+  max-width: 300px;
+  font-size: 14px;
+  color: #f0f0f0;
+}
+
+.feature-popup strong {
+  font-weight: bold;
+  color: #e0e0e0;
+}
+
+/* Seletor de variável para o gráfico */
+#variable-selector {
+  display: block;
+  margin: 5px auto;
+  width: 100%;
+  background-color: rgba(50, 50, 50, 0.8);
+  color: #f0f0f0;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+
+/* Canvas do gráfico */
+#polygon-chart {
+  width: 100%;
+  height: 100px;
+  max-height: 170px; /* Limitar altura máxima do gráfico */
+  display: block;
+}
+
+/* Controle de camadas de mapa */
+#map-layers-control {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: rgba(35, 35, 35, 0.85);
+  color: #f0f0f0;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  display: none;
+  max-width: 200px;
+}
+
+#map-layers-control h4 {
+  margin: 0;
+  flex-grow: 1;
+  margin-bottom: 10px;
+  font-size: 14px;
+  text-align: center;
+}
+
+#map-layers-control label {
+  display: block;
+  margin: 5px 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#map-layers-control input[type="radio"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+#toggle-map-layers {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999;
+  background: rgba(35, 35, 35, 0.85);
+  color: #f0f0f0;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+#toggle-map-layers:hover {
+  background: rgba(50, 50, 50, 0.9);
+}
+
+#toggle-map-layers i {
+  margin-right: 5px;
+}
+
+/* Controle para botões de minimizar */
+.minimize-button {
+  background: none;
+  border: none;
+  color: #f0f0f0;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.minimize-button:hover, .close-button:hover {
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+/* Estilo para cabeçalhos com botão de minimizar */
+.header-with-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+/* Container para os botões no cabeçalho do gráfico */
+.chart-header-buttons {
+  display: flex;
+  gap: 8px; /* Espaço entre os botões */
+  margin-left: auto; /* Empurra os botões para a direita */
+}
+
+/* Estilo para o botão de fechar */
+.close-button {
+  background: none;
+  border: none;
+  color: #f0f0f0;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 5px;
+  transition: transform 0.2s, color 0.2s;
+}
+
+/* Estilo específico para o container do chart para limitar altura */
+#chart-body {
+  width: 100%;
+  height: 170px; /* Altura fixa para o corpo do gráfico */
+  overflow: hidden; /* Evita overflow */
+  position: relative;
+}
+
+#polygon-chart {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 170px; /* Limitar altura máxima do gráfico */
+  display: block;
+}
+
+/* Container para os botões no cabeçalho do gráfico */
+.chart-header-buttons {
+  display: flex;
+  align-items: center;
+}

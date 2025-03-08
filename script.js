@@ -21,7 +21,29 @@ const CONFIG = {
     BOUNDS: [[-35.01807360131674, -79.99568018181952], [4.986926398683252, -30.000680181819533]],
     DEFAULT_ZOOM: 4.4, // Nível de zoom padrão (valores maiores = mais zoom)
     TILE_LAYER: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    TILE_ATTRIBUTION: "© OpenStreetMap contributors"
+    TILE_ATTRIBUTION: "© OpenStreetMap contributors",
+    LAYERS: {
+      OSM_STANDARD: {
+        name: "OSM Standard",
+        url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attribution: "© OpenStreetMap contributors"
+      },
+      OSM_TOPO: {
+        name: "OSM Topo",
+        url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        attribution: "© OpenStreetMap contributors, SRTM | © OpenTopoMap"
+      },
+      ESRI_SATELLITE: {
+        name: "Satélite",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attribution: "Esri, Maxar, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community"
+      },
+      CARTO_DARK: {
+        name: "Dark Mode",
+        url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        attribution: "© OpenStreetMap contributors, © CARTO"
+      }
+    }
   },
   STYLES: {
     BOUNDARY: { color: "#3388ff", weight: 1, opacity: 1, fillOpacity: 0.2 },
@@ -167,35 +189,43 @@ const restoreMapViewState = () => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Adicione no início do DOMContentLoaded
-  // Estilo para os popups de features
-  const popupStyle = document.createElement('style');
-  popupStyle.textContent = `
-    .feature-popup {
-      padding: 5px;
-      max-width: 300px;
-      font-size: 14px;
-    }
-    .feature-popup strong {
-      font-weight: bold;
-      color: #333;
-    }
-  `;
-  document.head.appendChild(popupStyle);
-
   /// Modificar o container do gráfico para ficar no topo direito com tamanho reduzido
   const chartContainer = document.createElement("div");
   chartContainer.id = "polygon-chart-container";
-  chartContainer.style.cssText = "position: absolute; top: 10px; right: 10px; width: 300px; height: 250px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.2); padding: 25px; display: none; z-index: 1000;";
   
+  // Criar header com título e controles
+  const chartHeaderContainer = document.createElement("div");
+  chartHeaderContainer.className = "header-with-controls";
+
   const chartTitle = document.createElement("h4");
-  chartTitle.style.cssText = "margin: 0 0 10px 0; font-size: 14px; text-align: center;";
   chartTitle.textContent = "System Evolution";
-  
+
+  // Container para os botões
+  const chartHeaderButtons = document.createElement("div");
+  chartHeaderButtons.className = "chart-header-buttons";
+
+  // Botão de minimizar
+  const chartMinimizeButton = document.createElement("button");
+  chartMinimizeButton.className = "minimize-button";
+  chartMinimizeButton.innerHTML = "−";
+  chartMinimizeButton.title = "Minimizar gráfico";
+
+  // Botão de fechar
+  const closeButton = document.createElement("button");
+  closeButton.textContent = "×";
+  closeButton.className = "close-button";
+
+  // Adicionar botões ao container de botões
+  chartHeaderButtons.appendChild(chartMinimizeButton);
+  chartHeaderButtons.appendChild(closeButton);
+
+  // Montar o header completo
+  chartHeaderContainer.appendChild(chartTitle);
+  chartHeaderContainer.appendChild(chartHeaderButtons);
+
   // Adicionar seletor de variável para o gráfico
   const variableSelector = document.createElement("select");
   variableSelector.id = "variable-selector";
-  variableSelector.style.cssText = "display: block; margin: 5px auto; width: 80%;";
   CONFIG.CHART.EVOLUTION_VARIABLES.forEach(variable => {
     const option = document.createElement("option");
     option.value = variable;
@@ -205,26 +235,57 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     variableSelector.appendChild(option);
   });
-  
+
+  // Criar o corpo do container do gráfico
+  const chartBody = document.createElement("div");
+  chartBody.id = "chart-body";
+
   // Ajustar a altura do canvas para o gráfico
   const chartCanvas = document.createElement("canvas");
   chartCanvas.id = "polygon-chart";
-  chartCanvas.style.width = "100%";
-  chartCanvas.style.height = "100px"; // Aumentar a altura do canvas
-  
-  const closeButton = document.createElement("button");
-  closeButton.textContent = "×";
-  closeButton.style.cssText = "position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 5px;";
-  closeButton.addEventListener("click", () => {
-    chartContainer.style.display = "none";
-  });
-  
-  chartContainer.appendChild(closeButton);
-  chartContainer.appendChild(chartTitle);
-  chartContainer.appendChild(variableSelector);
-  chartContainer.appendChild(chartCanvas);
+  chartBody.appendChild(variableSelector);
+  chartBody.appendChild(chartCanvas);
+
+  // Adicionar todos os elementos ao container principal
+  chartContainer.appendChild(chartHeaderContainer);
+  chartContainer.appendChild(chartBody);
   document.body.appendChild(chartContainer);
-  
+
+  // Evento para minimizar/maximizar o gráfico
+  chartMinimizeButton.addEventListener("click", (e) => {
+    e.stopPropagation(); // Evitar que o evento se propague para o mapa
+    
+    if (chartBody.style.display === "none") {
+      chartBody.style.display = "block";
+      chartMinimizeButton.innerHTML = "−";
+      chartMinimizeButton.title = "Minimizar gráfico";
+    } else {
+      chartBody.style.display = "none";
+      chartMinimizeButton.innerHTML = "+";
+      chartMinimizeButton.title = "Expandir gráfico";
+    }
+  });
+
+  // Evento para fechar o gráfico completamente
+  closeButton.addEventListener("click", (e) => {
+    e.stopPropagation(); // Evitar que o evento se propague para o mapa
+    
+    chartContainer.style.display = "none";
+    // Limpar seleção se o painel de gráfico for fechado
+    if (state.selection.uid) {
+      if (state.currentBoundaryLayer) {
+        state.currentBoundaryLayer.eachLayer(layer => {
+          state.currentBoundaryLayer.resetStyle(layer);
+        });
+      }
+      
+      state.selection.uid = null;
+      state.selection.feature = null;
+      state.selection.layer = null;
+      updateMarkers();
+    }
+  });
+
   // Adicionar a biblioteca Chart.js
   if (!document.querySelector('script[src*="chart.js"]')) {
     const chartScript = document.createElement("script");
@@ -401,11 +462,14 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: false, // Crucial para controle correto de dimensões
         plugins: {
           legend: {
             display: true,
-            position: 'top'
+            position: 'top',
+            labels: {
+              color: '#f0f0f0' // Cor clara para as legendas
+            }
           },
           tooltip: {
             callbacks: {
@@ -418,7 +482,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 return context.dataIndex === timeSeriesData.timestamps.length - 1 ? 
                   'Atual' : '';
               }
-            }
+            },
+            backgroundColor: 'rgba(50, 50, 50, 0.9)', // Fundo escuro para o tooltip
+            titleColor: '#f0f0f0', // Texto claro para o título do tooltip
+            bodyColor: '#f0f0f0', // Texto claro para o corpo do tooltip
+            borderColor: '#555', // Borda cinza para o tooltip
+            borderWidth: 1
           }
         },
         scales: {
@@ -427,30 +496,43 @@ document.addEventListener("DOMContentLoaded", () => {
               display: true,
               text: 'Time',
               padding: {
-                top: 10 // Adicionar padding para acomodar os rótulos
-              }
+                top: 10
+              },
+              color: '#f0f0f0' // Cor clara para o título do eixo X
             },
             ticks: {
               maxRotation: 45,
               minRotation: 45,
               autoSkip: true,
-              maxTicksLimit: 8, // Reduzir o número de rótulos para evitar sobreposição
-              padding: 8, // Adicionar padding aos rótulos
+              maxTicksLimit: 8,
+              padding: 8,
               font: {
-                size: 10 // Reduzir o tamanho da fonte para caber melhor
-              }
+                size: 10
+              },
+              color: '#e0e0e0' // Cor clara para os rótulos do eixo X
+            },
+            grid: {
+              color: 'rgba(160, 160, 160, 0.3)' // Linhas de grade mais claras e sutis
             }
           },
           y: {
             title: {
               display: true,
-              text: selectedVariable.charAt(0).toUpperCase() + selectedVariable.slice(1)
+              text: selectedVariable.charAt(0).toUpperCase() + selectedVariable.slice(1),
+              color: '#f0f0f0' // Cor clara para o título do eixo Y
             },
             ticks: {
               callback: function(value) {
                 return Number.isInteger(value) ? value : value.toFixed(2);
-              }
-            }
+              },
+              color: '#e0e0e0', // Cor clara para os rótulos do eixo Y
+              maxTicksLimit: 8 // Limitar número de ticks no eixo Y
+            },
+            grid: {
+              color: 'rgba(160, 160, 160, 0.3)' // Linhas de grade mais claras e sutis
+            },
+            beginAtZero: true,
+            grace: '10%', // Pequeno espaço acima do valor máximo
           }
         }
       }
@@ -515,8 +597,133 @@ document.addEventListener("DOMContentLoaded", () => {
     thresholdRadios: document.getElementsByName("thresholdFilter")
   };
 
-  // Configuração inicial do mapa
-  L.tileLayer(CONFIG.MAP.TILE_LAYER, { attribution: CONFIG.MAP.TILE_ATTRIBUTION }).addTo(elements.map);
+  // Inicialização das camadas de mapa (tile layers)
+  const baseLayers = {};
+  let currentBaseLayer = null;
+
+  // Cria o controle de camadas
+  const createLayersControl = () => {
+    // Criar botão para mostrar/ocultar o painel de camadas
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'toggle-map-layers';
+    toggleButton.innerHTML = '<i class="fa fa-layers"></i> Mapa';
+    document.body.appendChild(toggleButton);
+    
+    // Criar painel de controle de camadas
+    const layersControl = document.createElement('div');
+    layersControl.id = 'map-layers-control';
+    
+    // Criar um header com controles
+    const headerContainer = document.createElement('div');
+    headerContainer.className = 'header-with-controls';
+    
+    const controlTitle = document.createElement('h4');
+    controlTitle.textContent = 'Tipos de Mapa';
+    
+    // Botão de minimizar
+    const minimizeButton = document.createElement('button');
+    minimizeButton.className = 'minimize-button';
+    minimizeButton.innerHTML = '−'; // Character Unicode para o símbolo de minimizar
+    minimizeButton.title = 'Minimizar painel';
+    
+    // Adicionar ao container de header
+    headerContainer.appendChild(controlTitle);
+    headerContainer.appendChild(minimizeButton);
+    
+    // Adicionar o header ao painel de camadas
+    layersControl.appendChild(headerContainer);
+    
+    // Corpo do controle de camadas para conter as opções de radio
+    const layersControlBody = document.createElement('div');
+    layersControlBody.id = 'map-layers-control-body';
+    
+    // Adicionar opções de camadas ao corpo do container
+    Object.keys(CONFIG.MAP.LAYERS).forEach((layerKey, index) => {
+      const layer = CONFIG.MAP.LAYERS[layerKey];
+      
+      // Criar tile layer
+      const tileLayer = L.tileLayer(layer.url, { attribution: layer.attribution });
+      baseLayers[layerKey] = tileLayer;
+      
+      // Se for a primeira camada ou a camada padrão, adicioná-la ao mapa
+      if (index === 0) {
+        currentBaseLayer = tileLayer;
+        tileLayer.addTo(elements.map);
+      }
+      
+      // Criar opção de radio para esta camada
+      const layerOption = document.createElement('label');
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'mapLayer';
+      radio.value = layerKey;
+      radio.checked = index === 0;
+      
+      radio.addEventListener('change', () => {
+        // Remover camada atual
+        if (currentBaseLayer) {
+          elements.map.removeLayer(currentBaseLayer);
+        }
+        
+        // Adicionar a nova camada selecionada
+        currentBaseLayer = baseLayers[layerKey];
+        currentBaseLayer.addTo(elements.map);
+        
+        // Salvar preferência do usuário
+        localStorage.setItem('preferredMapLayer', layerKey);
+      });
+      
+      layerOption.appendChild(radio);
+      layerOption.appendChild(document.createTextNode(layer.name));
+      layersControlBody.appendChild(layerOption);
+    });
+    
+    // Adicionar o corpo ao painel principal
+    layersControl.appendChild(layersControlBody);
+    
+    document.body.appendChild(layersControl);
+    
+    // Evento para minimizar/maximizar o painel (alternando apenas o corpo)
+    minimizeButton.addEventListener('click', () => {
+      if (layersControlBody.style.display === 'none') {
+        layersControlBody.style.display = 'block';
+        minimizeButton.innerHTML = '−'; // Símbolo de minimizar
+        minimizeButton.title = 'Minimizar painel';
+      } else {
+        layersControlBody.style.display = 'none';
+        minimizeButton.innerHTML = '+'; // Símbolo de maximizar
+        minimizeButton.title = 'Expandir painel';
+      }
+    });
+    
+    // Evento para mostrar/ocultar o painel completo
+    toggleButton.addEventListener('click', () => {
+      if (layersControl.style.display === 'block') {
+        layersControl.style.display = 'none';
+      } else {
+        layersControl.style.display = 'block';
+      }
+    });
+    
+    // Restaurar preferência do usuário
+    const preferredLayer = localStorage.getItem('preferredMapLayer');
+    if (preferredLayer && baseLayers[preferredLayer]) {
+      const radioToSelect = document.querySelector(`input[name="mapLayer"][value="${preferredLayer}"]`);
+      if (radioToSelect) {
+        radioToSelect.checked = true;
+        // Dispara manualmente o evento change
+        const event = new Event('change');
+        radioToSelect.dispatchEvent(event);
+      }
+    }
+  };
+
+  // Remover a inicialização padrão do tile layer
+  // L.tileLayer(CONFIG.MAP.TILE_LAYER, { attribution: CONFIG.MAP.TILE_ATTRIBUTION }).addTo(elements.map);
+
+  // Chamar a função para criar o controle de camadas
+  createLayersControl();
+
   const markerGroup = L.layerGroup().addTo(elements.map);
 
   // Melhor controle de event listeners no mapa
@@ -1138,6 +1345,17 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTimestampInfo(state.geojsonLayers[state.currentIndex]);
     updateTrajectoryDisplay();
     elements.timelineSlider.value = state.currentIndex;
+
+    // Adicione isto onde você atualiza o valor do slider no script.js
+    // Por exemplo, quando você muda de camada:
+
+    // Depois de atualizar o valor do slider
+    document.getElementById('timeline').value = index;
+
+    // Chame a função para atualizar a visualização do progresso
+    if (window.updatePlayerProgress) {
+        window.updatePlayerProgress();
+    }
   };
 
   /**
@@ -1248,4 +1466,33 @@ document.addEventListener("DOMContentLoaded", () => {
     
     return found;
   };
+
+  // Adicione esta função ao seu arquivo script.js
+  function updateTimelineProgress() {
+    const timeline = document.getElementById('timeline');
+    if (timeline) {
+      const value = timeline.value;
+      const max = timeline.max || 100;
+      const progress = (value / max) * 100;
+      timeline.style.setProperty('--progress', `${progress}%`);
+    }
+  }
+
+  // Adicione estes event listeners
+  const timeline = document.getElementById('timeline');
+  if (timeline) {
+    timeline.addEventListener('input', updateTimelineProgress);
+    
+    // Atualize também quando o valor mudar programaticamente
+    const originalSetAttribute = timeline.setAttribute;
+    timeline.setAttribute = function(name, value) {
+      originalSetAttribute.call(this, name, value);
+      if (name === 'value') {
+        updateTimelineProgress();
+      }
+    };
+    
+    // Inicialização
+    updateTimelineProgress();
+  }
 });
