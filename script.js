@@ -204,11 +204,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const chartHeaderButtons = document.createElement("div");
   chartHeaderButtons.className = "chart-header-buttons";
 
-  // Botão de minimizar
-  const chartMinimizeButton = document.createElement("button");
-  chartMinimizeButton.className = "minimize-button";
-  chartMinimizeButton.innerHTML = "−";
-  chartMinimizeButton.title = "Minimizar gráfico";
 
   // Botão de fechar
   const closeButton = document.createElement("button");
@@ -216,7 +211,6 @@ document.addEventListener("DOMContentLoaded", () => {
   closeButton.className = "close-button";
 
   // Adicionar botões ao container de botões
-  chartHeaderButtons.appendChild(chartMinimizeButton);
   chartHeaderButtons.appendChild(closeButton);
 
   // Montar o header completo
@@ -251,20 +245,6 @@ document.addEventListener("DOMContentLoaded", () => {
   chartContainer.appendChild(chartBody);
   document.body.appendChild(chartContainer);
 
-  // Evento para minimizar/maximizar o gráfico
-  chartMinimizeButton.addEventListener("click", (e) => {
-    e.stopPropagation(); // Evitar que o evento se propague para o mapa
-    
-    if (chartBody.style.display === "none") {
-      chartBody.style.display = "block";
-      chartMinimizeButton.innerHTML = "−";
-      chartMinimizeButton.title = "Minimizar gráfico";
-    } else {
-      chartBody.style.display = "none";
-      chartMinimizeButton.innerHTML = "+";
-      chartMinimizeButton.title = "Expandir gráfico";
-    }
-  });
 
   // Evento para fechar o gráfico completamente
   closeButton.addEventListener("click", (e) => {

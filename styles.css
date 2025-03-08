@@ -289,7 +289,7 @@ input[type="checkbox"], input[type="radio"] {
   right: 10px;
   width: 320px;
   height: auto; /* Permitir altura automática baseada no conteúdo */
-  max-height: 280px; /* Altura máxima para evitar que fique muito grande */
+  max-height: 300px; /* Altura máxima para evitar que fique muito grande */
   background: rgba(35, 35, 35, 0.9) !important;
   color: #f0f0f0 !important;
   border-radius: 5px;
