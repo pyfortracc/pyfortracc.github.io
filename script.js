@@ -861,9 +861,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (state.currentTrajectoryLayer) {
       elements.map.removeLayer(state.currentTrajectoryLayer);
       state.currentTrajectoryLayer = null;
-      if (state.geojsonLayers[state.currentIndex]) {
-        state.geojsonLayers[state.currentIndex].trajectoryLayer = null;
-      }
     }
   };
 
@@ -948,6 +945,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     
     state.currentBoundaryLayer.addTo(elements.map);
+    
+    // Adicionar a remoção da camada de trajetória ao atualizar a camada de fronteira
+    removeTrajectoryLayer();
   };
 
   /**
