@@ -519,11 +519,11 @@ const mapUtils = (() => {
     // Save current UID before removing layer
     const currentSelectedUid = core.state.selection.uid;
     
-    // Save current trajectory state
-    const showTrajectoryCheckbox = core.elements && core.elements.showTrajectoryCheckbox;
+    // Save trajectory state before changing layers
+    const showTrajectoryCheckbox = document.getElementById("showTrajectory");
     const showTrajectory = showTrajectoryCheckbox ? showTrajectoryCheckbox.checked : false;
     
-    // Only remove the boundary layer, keeping trajectory if enabled
+    // Only remove boundary layer and leave trajectory handling to our specific logic
     if (core.state.currentBoundaryLayer) { 
       _map.removeLayer(core.state.currentBoundaryLayer); 
       core.state.currentBoundaryLayer = null;
@@ -533,6 +533,7 @@ const mapUtils = (() => {
       markerGroup.clearLayers();
     }
     
+    // Update current index before adding the new layer
     core.state.currentIndex = index;
     updateBoundaryLayer();
     
@@ -548,27 +549,19 @@ const mapUtils = (() => {
             layer.feature.properties && 
             layer.feature.properties.uid === currentSelectedUid &&
             core.passesThreshold(layer.feature)) {
-          
-          // Found polygon with the same UID
+          // Apply selected style
+          layer.setStyle(core.CONFIG.STYLES.SELECTED);
           core.state.selection.feature = layer.feature;
           core.state.selection.layer = layer;
-          layer.setStyle(core.CONFIG.STYLES.SELECTED);
-          
-          // Update chart with the polygon data
-          window.chartModule.updateChart(layer.feature);
           found = true;
         }
       });
       
       // If polygon not found in this layer but we want to keep the selection
       if (!found) {
-        // Polygon not present in this layer,
-        // but keep the UID for when we return to a layer that has it
         core.state.selection.feature = null;
         core.state.selection.layer = null;
-        
-        // Hide chart since polygon is not present in this layer
-        window.chartModule.hideChart();
+        // We keep the UID for when we go back to a layer where it exists
       }
     }
     
@@ -577,6 +570,8 @@ const mapUtils = (() => {
     
     // If trajectory was showing, update it for the new layer
     if (showTrajectory) {
+      // Important: First remove old trajectory then load new one
+      removeTrajectoryLayer();
       loadTrajectoryForCurrentLayer();
     }
     
@@ -592,7 +587,10 @@ const mapUtils = (() => {
    */
   const loadTrajectoryForCurrentLayer = () => {
     const currentLayer = core.state.geojsonLayers[core.state.currentIndex];
-    if (!currentLayer) return;
+    if (!currentLayer) {
+      console.warn("MapUtils: Cannot load trajectory - no current layer");
+      return;
+    }
     
     const baseName = core.utils.getBaseName(currentLayer.fileName);
     
@@ -600,9 +598,9 @@ const mapUtils = (() => {
     let trajectoryUrl = null;
     
     // First try exact match - key equals basename
-    if (core.state.trajectoryFiles[baseName]) {
+    if (core.state.trajectoryFiles && core.state.trajectoryFiles[baseName]) {
       trajectoryUrl = core.state.trajectoryFiles[baseName];
-    } else {
+    } else if (core.state.trajectoryFiles) {
       // Then try to find a case-insensitive match
       const matchingKey = Object.keys(core.state.trajectoryFiles).find(k => 
         k.toLowerCase() === baseName.toLowerCase()
@@ -624,9 +622,13 @@ const mapUtils = (() => {
     // If we already have trajectory data for this layer, just display it
     if (currentLayer.trajectoryGeojson) {
       console.log(`Using cached trajectory data for ${baseName}`);
-      core.state.currentTrajectoryLayer = createTrajectoryLayer(currentLayer.trajectoryGeojson);
-      core.state.currentTrajectoryLayer.addTo(_map);
-      currentLayer.trajectoryLayer = core.state.currentTrajectoryLayer;
+      try {
+        core.state.currentTrajectoryLayer = createTrajectoryLayer(currentLayer.trajectoryGeojson);
+        core.state.currentTrajectoryLayer.addTo(_map);
+        currentLayer.trajectoryLayer = core.state.currentTrajectoryLayer;
+      } catch (e) {
+        console.error("Error creating trajectory layer from cached data:", e);
+      }
       return;
     }
     
@@ -654,11 +656,6 @@ const mapUtils = (() => {
       })
       .catch(err => { 
         console.error(`Error loading trajectory for ${baseName}:`, err);
-        
-        // Uncheck the trajectory checkbox on error
-        if (core.elements.showTrajectoryCheckbox) {
-          core.elements.showTrajectoryCheckbox.checked = false;
-        }
       });
   };
   

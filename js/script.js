@@ -382,11 +382,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (core.state.playing) {
       const speed = core.elements.speedInput ? 
         parseFloat(core.elements.speedInput.value) : 2;
-        
+      
       core.state.playInterval = setInterval(() => {
-        // Preserve trajectory display state while playing
-        const showTrajectoryCheckbox = core.elements && core.elements.showTrajectoryCheckbox;
-        const trajectoryWasShowing = showTrajectoryCheckbox ? showTrajectoryCheckbox.checked : false;
+        // Remember if trajectory checkbox is checked before changing layers
+        const showTrajectoryCheckbox = document.getElementById("showTrajectory");
+        const shouldShowTrajectory = showTrajectoryCheckbox ? showTrajectoryCheckbox.checked : false;
         
         // Advance to next frame
         let next = core.state.currentIndex + 1;
@@ -395,10 +395,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Update the displayed layer
         window.mapUtils.showLayerAtIndex(next);
         
-        // Ensure trajectory display reflects checkbox state after layer change
-        if (trajectoryWasShowing && core.elements.showTrajectoryCheckbox) {
-          // Ensure trajectory visibility when timeline advances
-          core.elements.showTrajectoryCheckbox.checked = true;
+        // Ensure trajectory is maintained during playback
+        if (shouldShowTrajectory) {
+          // Ensure trajectory is loaded for the new layer
           window.mapUtils.loadTrajectoryForCurrentLayer();
         }
       }, speed * 1000);

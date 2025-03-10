@@ -11,7 +11,7 @@
 
 // ============ CONFIGURATION CONSTANTS ============
 const CONFIG = {
-  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_','expansion'],
+  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'lifetime','expansion'],
   CHART_DISPLAY_KEYS: ['size', 'min', 'expansion', 'inside_clusters'],
   DEFAULT_CHART_VARIABLE: 'size',
   DEFAULT_THRESHOLD: "235.0",
