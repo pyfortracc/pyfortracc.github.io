@@ -9,17 +9,18 @@
 // ============ CONFIGURAÇÕES E CONSTANTES ============
 const CONFIG = {
   DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_','expansion'],
-  DEFAULT_THRESHOLD: "235.0",
+  DEFAULT_THRESHOLD: "2.5",
   AUTO_CHECK_INTERVAL: 60000, // 60 segundos
-  TIME_OFFSET: -3, // UTC-3 horas
-  TIME_INCREMENT: 10, // +10 minutos
+  TIME_OFFSET: 0, // UTC-3 horas
+  TIME_INCREMENT: 0, // +10 minutos
   DIRECTORIES: {
     BOUNDARY: "track/boundary/",
     TRAJECTORY: "track/trajectory/"
   },
   MAP: {
-    BOUNDS: [[-35.01807360131674, -79.99568018181952], [4.986926398683252, -30.000680181819533]],
-    DEFAULT_ZOOM: 4.4, // Nível de zoom padrão (valores maiores = mais zoom)
+    // Bounds do globo terrestre completo (latitude: -90 a 90, longitude: -180 a 180)
+    BOUNDS: [[-90, -180], [90, 180]],
+    DEFAULT_ZOOM: 3.2, // Zoom mais distante para mostrar uma visão global
     TILE_LAYER: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     TILE_ATTRIBUTION: "© OpenStreetMap contributors",
     LAYERS: {
@@ -556,13 +557,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============ INICIALIZAÇÃO DE UI ============
   const elements = {
     map: L.map("map", {
-      center: [
-        (CONFIG.MAP.BOUNDS[0][0] + CONFIG.MAP.BOUNDS[1][0]) / 2, 
-        (CONFIG.MAP.BOUNDS[0][1] + CONFIG.MAP.BOUNDS[1][1]) / 2
-      ],
+      center: [0, 0], // Centro do mapa no equador
       zoom: CONFIG.MAP.DEFAULT_ZOOM,
-      zoomSnap: 0.1,  // Permite níveis de zoom com incrementos de 0.1
-      zoomDelta: 0.1  // Permite alteração do zoom em incrementos de 0.1
+      maxBounds: [[-90, -180], [90, 180]], // Limites máximos para navegação
+      zoomSnap: 0.1,
+      zoomDelta: 0.1
     }),
     timelineSlider: document.getElementById("timeline"),
     prevBtn: document.getElementById("prevLayer"),
@@ -825,7 +824,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (ts) {
           const date = new Date(ts);
           // Aplicar ajuste de fuso horário e incremento de minutos
-          date.setTime(date.getTime() + (CONFIG.TIME_OFFSET * 60 * 60 * 1000) + (CONFIG.TIME_INCREMENT * 60 * 1000));
+          date.setTime(date.getTime());
           ts = date.toISOString().replace('T', ' ').substring(0, 16);
         }
       }
@@ -1061,9 +1060,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Carregar todos os arquivos
-      let loadedCount = 0;
+      let loadingPromises = [];
       files.forEach(file => {
-        fetch(file.download_url)
+        const promise = fetch(file.download_url)
           .then(r => { 
             if (!r.ok) throw new Error(file.download_url); 
             return r.json(); 
@@ -1074,22 +1073,31 @@ document.addEventListener("DOMContentLoaded", () => {
             trajectoryLayer: null,
             trajectoryGeojson: null
           }))
-          .catch(err => console.error(`Erro ao carregar arquivo ${file.name}:`, err))
-          .finally(() => {
-            loadedCount++;
-            if (loadedCount === files.length && state.geojsonLayers.length > 0) {
-              // Processamento após carregar todos os arquivos
-              state.geojsonLayers.sort((a, b) => 
-                a.fileName.toLowerCase().localeCompare(b.fileName.toLowerCase())
-              );
-              
-              // Configurar UI
-              elements.timelineSlider.disabled = false;
-              elements.timelineSlider.min = 0;
-              elements.timelineSlider.max = state.geojsonLayers.length - 1;
-              elements.timelineSlider.value = state.geojsonLayers.length - 1; // Último índice
-              
-              // Exibir última camada
+          .catch(err => console.error(`Erro ao carregar arquivo ${file.name}:`, err));
+        
+        loadingPromises.push(promise);
+      });
+
+      // Usar Promise.all para garantir que todos os arquivos sejam carregados
+      Promise.all(loadingPromises)
+        .then(() => {
+          if (state.geojsonLayers.length > 0) {
+            // Processamento após carregar todos os arquivos
+            state.geojsonLayers.sort((a, b) => 
+              a.fileName.toLowerCase().localeCompare(b.fileName.toLowerCase())
+            );
+            
+            // Configurar UI
+            elements.timelineSlider.disabled = false;
+            elements.timelineSlider.min = 0;
+            elements.timelineSlider.max = state.geojsonLayers.length - 1;
+            elements.timelineSlider.value = state.geojsonLayers.length - 1; // Último índice
+            
+            // Forçar a exibição da primeira camada
+            showLayerAtIndex(0);
+            
+            // Depois, se necessário, mostrar a última camada
+            setTimeout(() => {
               showLayerAtIndex(state.geojsonLayers.length - 1);
               state.playing = false;
               elements.playPauseBtn.textContent = "Play";
@@ -1102,23 +1110,24 @@ document.addEventListener("DOMContentLoaded", () => {
                   selectPolygonByUid(previouslySelectedUid);
                   // Limpar o UID armazenado após restaurar a seleção
                   localStorage.removeItem('selectedSystemUid');
-                }, 500); // Pequeno atraso para garantir que a camada esteja completamente carregada
+                }, 300);
               }
               
-              // Restaurar o estado da visualização do mapa apenas após tudo estar pronto
-              // e todas as layers estiverem renderizadas
+              // Restaurar o estado da visualização do mapa
               setTimeout(() => {
                 restoreMapViewState();
-                // Forçar uma atualização de exibição para garantir que tudo esteja corretamente posicionado
+                // Forçar uma atualização de exibição
                 updateBoundaryLayer();
                 updateMarkers();
                 if (elements.showTrajectoryCheckbox.checked) {
                   loadTrajectoryForCurrentLayer();
                 }
-              }, 1000);
-            }
-          });
-      });
+                // Inicializar o progresso da timeline
+                updateTimelineProgress();
+              }, 500);
+            }, 300);
+          }
+        });
     }).catch(err => {
       console.error("Erro ao carregar camadas de fronteira:", err);
     });
@@ -1455,6 +1464,10 @@ document.addEventListener("DOMContentLoaded", () => {
       timeline.style.setProperty('--progress', `${progress}%`);
     }
   }
+
+  // Exportar para o escopo global para permitir chamar de fora
+  window.updateTimelineProgress = updateTimelineProgress;
+  window.updatePlayerProgress = updateTimelineProgress; // Alias para compatibilidade
 
   // Adicione estes event listeners
   const timeline = document.getElementById('timeline');
