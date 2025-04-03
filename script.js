@@ -56,8 +56,8 @@ const CONFIG = {
     TRAJECTORY_API: "https://api.github.com/repos/pyfortracc/pyfortracc.github.io/contents/track/trajectory/"
   },
   CHART: {
-    EVOLUTION_VARIABLES: ['size', 'min', 'expansion','inside_clusters'], // Variáveis que podem ser exibidas no gráfico de evolução
-    DEFAULT_VARIABLE: 'size' // Variável exibida por padrão
+    EVOLUTION_VARIABLES: ['max', 'size', 'expansion','inside_clusters'], // Variáveis que podem ser exibidas no gráfico de evolução
+    DEFAULT_VARIABLE: 'max' // Variável exibida por padrão
   },
   DOM_IDS: {
     POLYGON_CHART_CONTAINER: 'polygon-chart-container',
