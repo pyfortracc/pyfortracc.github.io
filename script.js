@@ -8,7 +8,7 @@
 
 // ============ CONFIGURAÇÕES E CONSTANTES ============
 const CONFIG = {
-  DISPLAY_KEYS: ['uid', 'status', 'size', 'min', 'ang_','expansion'],
+  DISPLAY_KEYS: ['uid', 'status', 'size', 'max', 'ang_','expansion'],
   DEFAULT_THRESHOLD: "2.5",
   AUTO_CHECK_INTERVAL: 60000, // 60 segundos
   TIME_OFFSET: 0, // UTC-3 horas
