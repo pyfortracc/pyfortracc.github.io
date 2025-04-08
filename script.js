@@ -85,7 +85,10 @@ const state = {
   chart: {
     instance: null,   // Instância do gráfico ativo
     container: null   // Referência ao container do gráfico
-  }
+  },
+  isPanelCollapsed: false,
+  currentMapLayer: 'OSM_STANDARD',
+  helpModalVisible: false
 };
 
 // ============ UTILITÁRIOS ============
@@ -138,6 +141,54 @@ const utils = {
     
     // Formata a data
     return adjustedDate.toISOString().replace('T', ' ').substring(0, 19);
+  },
+
+  /**
+   * Formata um número para exibição com unidades
+   */
+  formatNumber: (value, unit = '') => {
+    if (typeof value !== 'number') return value;
+    return `${value.toFixed(2)}${unit}`;
+  },
+
+  /**
+   * Cria um popup com informações formatadas
+   */
+  createFeaturePopup: (feature) => {
+    const properties = feature.properties;
+    let content = '<div class="feature-popup">';
+    
+    Object.entries(properties).forEach(([key, value]) => {
+      if (key === 'timestamp') {
+        content += `<strong>${key}:</strong> ${utils.formatTimestamp(value)}<br>`;
+      } else if (typeof value === 'number') {
+        content += `<strong>${key}:</strong> ${utils.formatNumber(value)}<br>`;
+      } else {
+        content += `<strong>${key}:</strong> ${value}<br>`;
+      }
+    });
+    
+    content += '</div>';
+    return content;
+  },
+
+  /**
+   * Cria um tooltip para um feature
+   */
+  createFeatureTooltip: (feature) => {
+    const properties = feature.properties;
+    let content = '<div class="centroid-tooltip">';
+    
+    // Mostrar apenas algumas propriedades importantes no tooltip
+    const importantKeys = ['uid', 'status', 'size'];
+    importantKeys.forEach(key => {
+      if (properties[key] !== undefined) {
+        content += `<strong>${key}:</strong> ${properties[key]}<br>`;
+      }
+    });
+    
+    content += '</div>';
+    return content;
   }
 };
 
@@ -146,6 +197,11 @@ const utils = {
  */
 const saveMapViewState = () => {
   try {
+    // Verificar se o mapa existe e está inicializado
+    if (!elements.map || typeof elements.map.getCenter !== 'function') {
+      return;
+    }
+
     const mapCenter = elements.map.getCenter();
     const mapZoom = elements.map.getZoom();
     
@@ -167,9 +223,14 @@ const saveMapViewState = () => {
  * Restaura o estado da visualização do mapa
  */
 const restoreMapViewState = () => {
-  const savedView = localStorage.getItem('mapViewState');
-  if (savedView) {
-    try {
+  try {
+    // Verificar se o mapa existe e está inicializado
+    if (!elements.map || typeof elements.map.setView !== 'function') {
+      return;
+    }
+
+    const savedView = localStorage.getItem('mapViewState');
+    if (savedView) {
       const viewState = JSON.parse(savedView);
       // Verificar se os valores são válidos antes de aplicar
       if (viewState.center && 
@@ -182,9 +243,9 @@ const restoreMapViewState = () => {
       } else {
         console.warn("Dados de visualização inválidos, usando valores padrão");
       }
-    } catch (e) {
-      console.error("Erro ao restaurar estado do mapa:", e);
     }
+  } catch (e) {
+    console.error("Erro ao restaurar estado do mapa:", e);
   }
 };
 
@@ -204,13 +265,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const chartHeaderButtons = document.createElement("div");
   chartHeaderButtons.className = "chart-header-buttons";
 
+  // Botão de minimizar
+  const minimizeButton = document.createElement("button");
+  minimizeButton.className = "minimize-button";
+  minimizeButton.innerHTML = "−";
+  minimizeButton.title = "Minimizar gráfico";
 
   // Botão de fechar
   const closeButton = document.createElement("button");
-  closeButton.textContent = "×";
   closeButton.className = "close-button";
+  closeButton.innerHTML = "×";
+  closeButton.title = "Fechar gráfico";
 
   // Adicionar botões ao container de botões
+  chartHeaderButtons.appendChild(minimizeButton);
   chartHeaderButtons.appendChild(closeButton);
 
   // Montar o header completo
@@ -240,16 +308,181 @@ document.addEventListener("DOMContentLoaded", () => {
   chartBody.appendChild(variableSelector);
   chartBody.appendChild(chartCanvas);
 
+  // Adicionar handle de redimensionamento
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "resize-handle";
+  chartContainer.appendChild(resizeHandle);
+
   // Adicionar todos os elementos ao container principal
   chartContainer.appendChild(chartHeaderContainer);
   chartContainer.appendChild(chartBody);
   document.body.appendChild(chartContainer);
 
+  // Implementar funcionalidade de arrasto
+  let isDragging = false;
+  let currentX;
+  let currentY;
+  let initialX;
+  let initialY;
+  let xOffset = 0;
+  let yOffset = 0;
 
-  // Evento para fechar o gráfico completamente
-  closeButton.addEventListener("click", (e) => {
-    e.stopPropagation(); // Evitar que o evento se propague para o mapa
+  chartHeaderContainer.addEventListener("mousedown", dragStart);
+  document.addEventListener("mousemove", drag);
+  document.addEventListener("mouseup", dragEnd);
+
+  function dragStart(e) {
+    // Não iniciar arrasto se estiver redimensionando
+    if (isResizing) return;
     
+    // Só iniciar arrasto se clicar na barra de título
+    if (e.target === chartHeaderContainer || e.target.parentNode === chartHeaderContainer) {
+      isDragging = true;
+      chartContainer.classList.add("dragging");
+      
+      // Capturar a posição inicial do mouse e o offset atual
+      initialX = e.clientX;
+      initialY = e.clientY;
+      
+      // Obter o offset atual do container
+      const transform = window.getComputedStyle(chartContainer).transform;
+      if (transform !== 'none') {
+        const matrix = new DOMMatrix(transform);
+        xOffset = matrix.m41;
+        yOffset = matrix.m42;
+      }
+    }
+  }
+
+  function drag(e) {
+    if (isDragging) {
+      e.preventDefault();
+      
+      // Calcular a nova posição baseada no movimento do mouse
+      const dx = e.clientX - initialX;
+      const dy = e.clientY - initialY;
+      
+      currentX = xOffset + dx;
+      currentY = yOffset + dy;
+
+      // Obter dimensões do container e da janela
+      const containerRect = chartContainer.getBoundingClientRect();
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      
+      // Calcular limites baseados no tamanho da tela
+      const maxX = windowWidth - containerRect.width;
+      const maxY = windowHeight - containerRect.height;
+      
+      // Aplicar limites com margens de segurança
+      const margin = 20; // Margem de segurança em pixels
+      currentX = Math.min(Math.max(currentX, margin), maxX - margin);
+      currentY = Math.min(Math.max(currentY, margin), maxY - margin);
+
+      // Usar requestAnimationFrame para melhor performance
+      requestAnimationFrame(() => {
+        setTranslate(currentX, currentY, chartContainer);
+      });
+    }
+  }
+
+  function dragEnd(e) {
+    if (isDragging) {
+      isDragging = false;
+      chartContainer.classList.remove("dragging");
+      
+      // Atualizar o offset para a próxima operação de arrasto
+      xOffset = currentX;
+      yOffset = currentY;
+    }
+  }
+
+  function setTranslate(xPos, yPos, el) {
+    // Usar transform3d para forçar aceleração de hardware
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+  }
+
+  // Implementar funcionalidade de redimensionamento
+  let isResizing = false;
+  let startX, startY, startWidth, startHeight;
+
+  resizeHandle.addEventListener("mousedown", initResize);
+
+  function initResize(e) {
+    e.preventDefault();
+    isResizing = true;
+    chartContainer.classList.add("resizing");
+    
+    startX = e.clientX;
+    startY = e.clientY;
+    startWidth = parseInt(document.defaultView.getComputedStyle(chartContainer).width, 10);
+    startHeight = parseInt(document.defaultView.getComputedStyle(chartContainer).height, 10);
+    
+    document.addEventListener("mousemove", resize);
+    document.addEventListener("mouseup", stopResize);
+  }
+
+  function resize(e) {
+    if (!isResizing) return;
+    
+    // Calcular nova largura e altura
+    const width = startWidth + (e.clientX - startX);
+    const height = startHeight + (e.clientY - startY);
+    
+    // Obter dimensões da janela
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    // Calcular limites baseados no tamanho da tela
+    const minWidth = 250;
+    const minHeight = 200;
+    const maxWidth = windowWidth * 0.9; // 90% da largura da tela
+    const maxHeight = windowHeight * 0.9; // 90% da altura da tela
+    
+    // Aplicar nova dimensão com limites
+    const newWidth = Math.min(Math.max(width, minWidth), maxWidth);
+    const newHeight = Math.min(Math.max(height, minHeight), maxHeight);
+    
+    // Aplicar a nova dimensão apenas se for diferente da atual
+    if (newWidth !== parseInt(chartContainer.style.width) || 
+        newHeight !== parseInt(chartContainer.style.height)) {
+      chartContainer.style.width = newWidth + "px";
+      chartContainer.style.height = newHeight + "px";
+      
+      // Atualizar o gráfico
+      if (polygonChart) {
+        polygonChart.resize();
+      }
+    }
+  }
+
+  function stopResize() {
+    if (isResizing) {
+      isResizing = false;
+      chartContainer.classList.remove("resizing");
+      document.removeEventListener("mousemove", resize);
+      document.removeEventListener("mouseup", stopResize);
+    }
+  }
+
+  // Evento para minimizar/maximizar o gráfico
+  minimizeButton.addEventListener("click", () => {
+    chartContainer.classList.toggle("minimized");
+    minimizeButton.innerHTML = chartContainer.classList.contains("minimized") ? "+" : "−";
+    
+    // Se estiver minimizando, ajustar a altura para 50px
+    if (chartContainer.classList.contains("minimized")) {
+      chartContainer.style.height = "50px";
+      chartBody.style.display = "none";
+    } else {
+      // Se estiver maximizando, restaurar a altura original
+      chartContainer.style.height = "40vh";
+      chartBody.style.display = "block";
+    }
+  });
+
+  // Evento para fechar o gráfico
+  closeButton.addEventListener("click", () => {
     chartContainer.style.display = "none";
     // Limpar seleção se o painel de gráfico for fechado
     if (state.selection.uid) {
@@ -285,6 +518,17 @@ document.addEventListener("DOMContentLoaded", () => {
       updatePolygonChart(state.selection.feature);
     }
   });
+
+  // Adicionar ResizeObserver para atualizar o gráfico quando o container for redimensionado
+  const resizeObserver = new ResizeObserver(entries => {
+    for (const entry of entries) {
+      if (polygonChart) {
+        polygonChart.resize();
+      }
+    }
+  });
+
+  resizeObserver.observe(chartContainer);
 
   /**
    * Função que coleta dados do polígono em todas as camadas de tempo (versão otimizada)
@@ -358,6 +602,11 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Atualizar com o novo formato de título
     chartTitle.textContent = `System Evolution UID: ${uid}`;
+    
+    // Mostrar o container do gráfico
+    chartContainer.style.display = "block";
+    chartContainer.classList.remove("minimized");
+    minimizeButton.innerHTML = "−";
     
     // Coletar dados ao longo do tempo para este polígono
     
@@ -520,6 +769,31 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Mostrar o container do gráfico
     document.getElementById(CONFIG.DOM_IDS.POLYGON_CHART_CONTAINER).style.display = "block";
+
+    // Adicionar animação ao gráfico
+    polygonChart.options.animation = {
+      duration: 1000,
+      easing: 'easeInOutQuart'
+    };
+    
+    // Adicionar tooltips personalizados
+    polygonChart.options.plugins.tooltip = {
+      callbacks: {
+        label: (context) => {
+          const value = context.parsed.y;
+          return `${context.dataset.label}: ${utils.formatNumber(value)}`;
+        }
+      }
+    };
+    
+    polygonChart.update();
+
+    // Adicionar configuração para responsividade do gráfico
+    if (polygonChart) {
+      polygonChart.options.responsive = true;
+      polygonChart.options.maintainAspectRatio = false;
+      polygonChart.update();
+    }
   };
 
   /**
@@ -572,7 +846,15 @@ document.addEventListener("DOMContentLoaded", () => {
     trackInfo: document.getElementById("track-info") || document.getElementById("timestamp-info"),
     dynamicOptionsContainer: document.getElementById("dynamic-options"),
     showTrajectoryCheckbox: document.getElementById("showTrajectory"),
-    thresholdRadios: document.getElementsByName("thresholdFilter")
+    thresholdRadios: document.getElementsByName("thresholdFilter"),
+    helpButton: document.getElementById('help-button'),
+    helpModal: document.getElementById('help-modal'),
+    closeModal: document.querySelector('.close'),
+    togglePanel: document.getElementById('toggle-panel'),
+    infoPanel: document.getElementById('info-panel'),
+    layerControls: document.getElementById('layer-controls'),
+    currentTime: document.getElementById('current-time'),
+    infoContent: document.getElementById('info-content')
   };
 
   // Inicialização das camadas de mapa (tile layers)
@@ -779,8 +1061,18 @@ document.addEventListener("DOMContentLoaded", () => {
    * Computa o centroide de uma feature poligonal
    */
   const computeCentroid = feature => {
-    if (!feature.geometry || feature.geometry.type !== "Polygon") return null;
-    const coords = feature.geometry.coordinates[0];
+    if (!feature.geometry) return null;
+    
+    let coords;
+    if (feature.geometry.type === "Polygon") {
+      coords = feature.geometry.coordinates[0];
+    } else if (feature.geometry.type === "MultiPolygon") {
+      // Para MultiPolygon, usamos o primeiro polígono para calcular o centroide
+      coords = feature.geometry.coordinates[0][0];
+    } else {
+      return null;
+    }
+    
     let [sumX, sumY] = [0, 0];
     coords.forEach(c => { sumX += c[0]; sumY += c[1]; });
     return [sumY / coords.length, sumX / coords.length];
@@ -939,6 +1231,13 @@ document.addEventListener("DOMContentLoaded", () => {
           
           // Atualiza os marcadores para mostrar apenas este polígono
           updateMarkers();
+        });
+
+        // Adicionar popups e tooltips aos features
+        layer.bindPopup(utils.createFeaturePopup(feature));
+        layer.bindTooltip(utils.createFeatureTooltip(feature), {
+          permanent: false,
+          direction: 'auto'
         });
       }
     });
@@ -1113,17 +1412,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, 300);
               }
               
-              // Restaurar o estado da visualização do mapa
+              // Forçar uma atualização de exibição
+              updateBoundaryLayer();
+              updateMarkers();
+              if (elements.showTrajectoryCheckbox.checked) {
+                loadTrajectoryForCurrentLayer();
+              }
+              // Inicializar o progresso da timeline
+              updateTimelineProgress();
+
+              // Restaurar o estado do mapa após um pequeno delay para garantir que tudo está inicializado
               setTimeout(() => {
                 restoreMapViewState();
-                // Forçar uma atualização de exibição
-                updateBoundaryLayer();
-                updateMarkers();
-                if (elements.showTrajectoryCheckbox.checked) {
-                  loadTrajectoryForCurrentLayer();
-                }
-                // Inicializar o progresso da timeline
-                updateTimelineProgress();
               }, 500);
             }, 300);
           }
@@ -1253,7 +1553,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const updateDisplayOptions = () => {
     CONFIG.DISPLAY_KEYS.forEach(field => {
       const chk = document.querySelector(`input[name="${field}"]`);
-      if (chk) state.displayOptions[field] = chk.checked;
+      if (chk) {
+        state.displayOptions[field] = chk.checked;
+        // Salvar no localStorage
+        localStorage.setItem('displayOptions', JSON.stringify(state.displayOptions));
+      }
     });
     updateMarkers();
   };
@@ -1295,7 +1599,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Se havia um polígono selecionado, tentar selecioná-lo novamente na nova camada
     if (currentSelectedUid) {
       // Restaurar a seleção do UID na nova camada
-      state.selection.uid = currentSelectedUid; // Manter o UID selecionado
+      state.selection.uid = currentSelectedUid;
       
       // Tentar encontrar o polígono na nova camada e aplicar estilo
       let found = false;
@@ -1305,44 +1609,28 @@ document.addEventListener("DOMContentLoaded", () => {
             layer.feature.properties.uid === currentSelectedUid &&
             passesThreshold(layer.feature)) {
           
-          // Encontramos o polígono com o mesmo UID
           state.selection.feature = layer.feature;
           state.selection.layer = layer;
           layer.setStyle(CONFIG.STYLES.SELECTED);
           
-          // Atualizar o gráfico com os dados do polígono
           updatePolygonChart(layer.feature);
           found = true;
         }
       });
       
-      // Se não encontrou o polígono nesta camada mas ainda queremos manter a seleção
       if (!found) {
-        // Neste caso, o polígono não está presente nesta camada, 
-        // mas mantemos o UID para quando voltar a uma camada que o tenha
         state.selection.feature = null;
         state.selection.layer = null;
-        
-        // Esconder o gráfico porque o polígono não está presente nesta camada
         document.getElementById(CONFIG.DOM_IDS.POLYGON_CHART_CONTAINER).style.display = "none";
       }
     }
     
+    // Atualizar os marcadores com as opções de exibição atuais
     updateMarkers();
     updateTimestampInfo(state.geojsonLayers[state.currentIndex]);
     updateTrajectoryDisplay();
     elements.timelineSlider.value = state.currentIndex;
-
-    // Adicione isto onde você atualiza o valor do slider no script.js
-    // Por exemplo, quando você muda de camada:
-
-    // Depois de atualizar o valor do slider
-    document.getElementById('timeline').value = index;
-
-    // Chame a função para atualizar a visualização do progresso
-    if (window.updatePlayerProgress) {
-        window.updatePlayerProgress();
-    }
+    updateTimelineProgress();
   };
 
   /**
@@ -1486,4 +1774,235 @@ document.addEventListener("DOMContentLoaded", () => {
     // Inicialização
     updateTimelineProgress();
   }
+
+  // Adicionar novos manipuladores de eventos
+  const eventHandlers = {
+    /**
+     * Manipula o clique no botão de ajuda
+     */
+    handleHelpButtonClick: () => {
+      state.helpModalVisible = !state.helpModalVisible;
+      elements.helpModal.style.display = state.helpModalVisible ? 'block' : 'none';
+    },
+
+    /**
+     * Manipula o clique no botão de fechar o modal
+     */
+    handleCloseModalClick: () => {
+      state.helpModalVisible = false;
+      elements.helpModal.style.display = 'none';
+    },
+
+    /**
+     * Manipula o clique no botão de alternar painel
+     */
+    handleTogglePanelClick: () => {
+      state.isPanelCollapsed = !state.isPanelCollapsed;
+      const panel = elements.infoPanel;
+      const toggleButton = elements.togglePanel;
+      
+      if (state.isPanelCollapsed) {
+        panel.style.transform = 'translateX(calc(100% - 40px))';
+        toggleButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        // Garantir que o painel fique visível
+        panel.style.opacity = '1';
+        panel.style.pointerEvents = 'auto';
+      } else {
+        panel.style.transform = 'translateX(0)';
+        toggleButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+      }
+      
+      // Salvar estado do painel
+      localStorage.setItem('panelState', state.isPanelCollapsed ? 'collapsed' : 'expanded');
+    },
+
+    /**
+     * Manipula a mudança de camada do mapa
+     */
+    handleMapLayerChange: (layerName) => {
+      state.currentMapLayer = layerName;
+      const layerConfig = CONFIG.MAP.LAYERS[layerName];
+      
+      // Remove a camada atual
+      if (state.currentMapLayer) {
+        elements.map.removeLayer(elements.mapLayer);
+      }
+      
+      // Adiciona a nova camada
+      elements.mapLayer = L.tileLayer(layerConfig.url, {
+        attribution: layerConfig.attribution
+      }).addTo(elements.map);
+    }
+  };
+
+  // Adicionar novas funções de inicialização
+  const init = {
+    /**
+     * Inicializa os controles de camada do mapa
+     */
+    initMapLayerControls: () => {
+      const container = elements.layerControls;
+      container.innerHTML = '';
+      
+      Object.entries(CONFIG.MAP.LAYERS).forEach(([key, layer]) => {
+        const label = document.createElement('label');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'mapLayer';
+        radio.value = key;
+        radio.checked = key === state.currentMapLayer;
+        
+        radio.addEventListener('change', () => eventHandlers.handleMapLayerChange(key));
+        
+        label.appendChild(radio);
+        label.appendChild(document.createTextNode(layer.name));
+        container.appendChild(label);
+      });
+    },
+
+    /**
+     * Inicializa os eventos do modal de ajuda
+     */
+    initHelpModal: () => {
+      elements.helpButton.addEventListener('click', eventHandlers.handleHelpButtonClick);
+      elements.closeModal.addEventListener('click', eventHandlers.handleCloseModalClick);
+      
+      // Fechar modal ao clicar fora
+      window.addEventListener('click', (event) => {
+        if (event.target === elements.helpModal) {
+          eventHandlers.handleCloseModalClick();
+        }
+      });
+    },
+
+    /**
+     * Inicializa os eventos do painel de informações
+     */
+    initInfoPanel: () => {
+      elements.togglePanel.addEventListener('click', eventHandlers.handleTogglePanelClick);
+    }
+  };
+
+  // Inicializar novos componentes
+  init.initMapLayerControls();
+  init.initHelpModal();
+  init.initInfoPanel();
+  
+  // Restaurar estado do painel
+  const savedPanelState = localStorage.getItem('panelState');
+  if (savedPanelState === 'collapsed') {
+    state.isPanelCollapsed = true;
+    elements.infoPanel.style.transform = 'translateX(calc(100% - 40px))';
+    elements.togglePanel.innerHTML = '<i class="fas fa-chevron-right"></i>';
+  }
+
+  // Carregar campos selecionados do localStorage
+  const loadSelectedFields = () => {
+    const savedFields = localStorage.getItem('selectedFields');
+    if (savedFields) {
+      const selectedFields = JSON.parse(savedFields);
+      elements.fieldCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectedFields.includes(checkbox.value);
+      });
+    }
+  };
+
+  // Chamar a função quando a página carregar
+  document.addEventListener('DOMContentLoaded', loadSelectedFields);
+
+  // Adicione no início do arquivo, após a definição do state:
+  // Carregar opções de exibição do localStorage
+  const loadDisplayOptions = () => {
+    const savedOptions = localStorage.getItem('displayOptions');
+    if (savedOptions) {
+      state.displayOptions = JSON.parse(savedOptions);
+      // Atualizar os checkboxes
+      Object.entries(state.displayOptions).forEach(([key, value]) => {
+        const checkbox = document.querySelector(`input[name="${key}"]`);
+        if (checkbox) {
+          checkbox.checked = value;
+        }
+      });
+    }
+  };
+
+  // Chamar a função quando a página carregar
+  document.addEventListener('DOMContentLoaded', loadDisplayOptions);
+
+  // Função para centralizar o gráfico na tela
+  function centerChart() {
+    const containerRect = chartContainer.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    const centerX = (windowWidth - containerRect.width) / 2;
+    const centerY = (windowHeight - containerRect.height) / 2;
+    
+    setTranslate(centerX, centerY, chartContainer);
+    xOffset = centerX;
+    yOffset = centerY;
+  }
+
+  // Adicionar listener para redimensionamento da janela
+  window.addEventListener('resize', () => {
+    // Se o gráfico estiver visível, ajustar sua posição
+    if (chartContainer.style.display !== 'none') {
+      const containerRect = chartContainer.getBoundingClientRect();
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      
+      // Verificar se o gráfico está fora da tela
+      if (xOffset + containerRect.width > windowWidth || 
+          yOffset + containerRect.height > windowHeight) {
+        centerChart();
+      }
+    }
+  });
 });
+
+// Na função updateFeatureInfo:
+updateFeatureInfo: (feature) => {
+  const infoContent = elements.infoContent;
+  if (!feature) {
+    infoContent.innerHTML = '<p>Nenhum elemento selecionado</p>';
+    return;
+  }
+
+  const properties = feature.getProperties();
+  const selectedFields = Array.from(elements.fieldCheckboxes)
+    .filter(checkbox => checkbox.checked)
+    .map(checkbox => checkbox.value);
+
+  let html = '<div class="feature-info">';
+  
+  // Mostrar campos marcados primeiro
+  if (selectedFields.length > 0) {
+    html += '<div class="selected-fields">';
+    selectedFields.forEach(field => {
+      if (properties[field] !== undefined) {
+        html += `<div class="field-item">
+          <span class="field-label">${field}:</span>
+          <span class="field-value">${properties[field]}</span>
+        </div>`;
+      }
+    });
+    html += '</div>';
+  }
+
+  // Mostrar outros campos
+  html += '<div class="other-fields">';
+  Object.entries(properties).forEach(([key, value]) => {
+    if (!selectedFields.includes(key) && value !== undefined) {
+      html += `<div class="field-item">
+        <span class="field-label">${key}:</span>
+        <span class="field-value">${value}</span>
+      </div>`;
+    }
+  });
+  html += '</div></div>';
+
+  infoContent.innerHTML = html;
+  
+  // Salvar campos selecionados
+  localStorage.setItem('selectedFields', JSON.stringify(selectedFields));
+}

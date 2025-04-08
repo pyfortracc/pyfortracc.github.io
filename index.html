@@ -5,51 +5,112 @@
     <title>pyForTraCC Visualizer</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
   </head>
   <body>
     <div id="map"></div>
-    <div id="timestamp-info">Track :</div>
+    
+    <!-- Painel de informações e controles -->
     <div id="info-panel">
-      <h3>View Options:</h3>
-      <!-- Controles para as chaves dos centroides -->
-      <div id="dynamic-options"></div>
-      <!-- Controle para trajectory -->
-      <div id="trajectory-option" class="filter-option">
-        <label>
-          <input type="checkbox" id="showTrajectory" />
-          trajectory
-        </label>
+      <div class="panel-header">
+        <h3><i class="fas fa-cog"></i> View Options</h3>
+        <button id="toggle-panel" class="toggle-button"><i class="fas fa-chevron-left"></i></button>
       </div>
-      <!-- Controle para filtrar por threshold -->
-      <div id="threshold-filter" class="filter-option">
-        <!-- Centralize Threshold text -->
-        <span>Threshold:</span><br>
-        <label>
-          <input type="radio" name="thresholdFilter" value="2.5" checked />
-          2.5
-        </label>
-        <label>
-          <input type="radio" name="thresholdFilter" value="5" />
-          5
-        </label>
+      
+      <div class="panel-content">
+        <!-- Controles para as chaves dos centroides -->
+        <div id="dynamic-options" class="options-section">
+          <h4><i class="fas fa-layer-group"></i> Display Properties</h4>
+        </div>
+        
+        <!-- Controle para trajectory -->
+        <div id="trajectory-option" class="filter-option">
+          <label>
+            <input type="checkbox" id="showTrajectory" />
+            <i class="fas fa-route"></i> Show Trajectory
+          </label>
+        </div>
+        
+        <!-- Controle para filtrar por threshold -->
+        <div id="threshold-filter" class="filter-option">
+          <h4><i class="fas fa-filter"></i> Threshold Filter</h4>
+          <div class="threshold-options">
+            <label>
+              <input type="radio" name="thresholdFilter" value="2.5" checked />
+              2.5
+            </label>
+            <label>
+              <input type="radio" name="thresholdFilter" value="5" />
+              5
+            </label>
+          </div>
+        </div>
+
+        <!-- Controle de camadas do mapa -->
+        <div id="map-layers" class="filter-option">
+          <h4><i class="fas fa-map"></i> Map Style</h4>
+          <div id="layer-controls"></div>
+        </div>
       </div>
     </div>
+
+    <!-- Painel de timeline e controles de reprodução -->
     <div id="controls">
+      <div id="timestamp-info">
+        <i class="fas fa-clock"></i> <span id="current-time">Track :</span>
+      </div>
+      
       <div id="slider-container">
         <input type="range" id="timeline" min="0" value="0" step="1" disabled />
       </div>
+      
       <div id="player-controls">
-        <button id="prevLayer">&laquo;</button>
-        <button id="playPause">Play</button>
-        <button id="nextLayer">&raquo;</button>
+        <button id="prevLayer" title="Previous"><i class="fas fa-step-backward"></i></button>
+        <button id="playPause" title="Play/Pause"><i class="fas fa-play"></i></button>
+        <button id="nextLayer" title="Next"><i class="fas fa-step-forward"></i></button>
       </div>
-      <div id="speed-label">
-        Speed:
+      
+      <div id="speed-control">
+        <label for="speed">
+          <i class="fas fa-tachometer-alt"></i> Speed:
+        </label>
         <input type="range" id="speed" min="0.5" max="5" step="0.1" value="2" />
         <span id="speedValue">2</span>s
       </div>
     </div>
+
+    <!-- Botão de ajuda -->
+    <button id="help-button" title="Help">
+      <i class="fas fa-question-circle"></i>
+    </button>
+
+    <!-- Modal de ajuda -->
+    <div id="help-modal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Help</h2>
+        <div class="help-content">
+          <h3>Controls</h3>
+          <ul>
+            <li><i class="fas fa-play"></i> Play/Pause: Start or pause the animation</li>
+            <li><i class="fas fa-step-backward"></i> Previous: Go to previous time step</li>
+            <li><i class="fas fa-step-forward"></i> Next: Go to next time step</li>
+            <li><i class="fas fa-tachometer-alt"></i> Speed: Adjust animation speed</li>
+            <li><i class="fas fa-filter"></i> Threshold: Filter data by threshold value</li>
+            <li><i class="fas fa-route"></i> Trajectory: Show/hide trajectory lines</li>
+          </ul>
+          <h3>Map Interaction</h3>
+          <ul>
+            <li>Click on a polygon to view its details</li>
+            <li>Use mouse wheel to zoom in/out</li>
+            <li>Drag to pan the map</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
     <script src="player.js"></script>
   </body>

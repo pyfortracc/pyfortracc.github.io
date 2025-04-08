@@ -1,470 +1,553 @@
-html,
-body,
-#map {
-  height: 100%;
+/* Estilos gerais */
+:root {
+  --primary-color: #2c3e50;
+  --secondary-color: #34495e;
+  --accent-color: #e74c3c;
+  --background-color: rgba(44, 62, 80, 0.9);
+  --text-color: #ecf0f1;
+  --border-color: #34495e;
+  --panel-width: 300px;
+  --controls-height: 80px;
+  --header-background: #f8f9fa;
+}
+
+* {
   margin: 0;
   padding: 0;
-  color: #f0f0f0;
-  font-family: sans-serif;
+  box-sizing: border-box;
 }
 
-/* Caixa com o timestamp exibido na parte superior centralizada */
-#timestamp-info {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  background: rgba(30, 30, 30, 0.85);
-  color: #f0f0f0;
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-family: sans-serif;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
-/* Caixa de controles (player) posicionada na parte inferior centralizada */
-#controls {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  background: rgba(35, 35, 35, 0.85);
-  color: #f0f0f0;
-  padding: 10px;
-  width: 300px;
-  border-radius: 5px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  font-family: sans-serif;
-  text-align: center;
-  backdrop-filter: blur(3px);
+/* Estilos do mapa */
+#map {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 
-/* Caixa para os controles de exibição dos campos, trajectory e threshold, posicionada à direita centralizada verticalmente */
+/* Painel de informações */
 #info-panel {
-  position: absolute;
+  position: fixed;
+  top: 20px;
   right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
+  width: var(--panel-width);
+  background: var(--background-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   z-index: 1000;
-  background: rgba(35, 35, 35, 0.85);
-  color: #f0f0f0;
+  transition: transform 0.3s ease;
+  backdrop-filter: blur(5px);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+#info-panel.collapsed {
+  transform: translateX(calc(var(--panel-width) - 40px));
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  font-family: sans-serif;
-  max-width: 220px;
-  backdrop-filter: blur(3px);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  background: var(--background-color);
+  z-index: 1;
 }
 
-#info-panel h3 {
-  margin-top: 0;
+.panel-header h3 {
+  margin: 0;
   font-size: 1em;
+  color: var(--text-color);
+  flex-grow: 1;
   text-align: center;
-  color: #f0f0f0;
 }
 
-/* Controles dinâmicos criados para cada campo */
-.field-option {
+.toggle-button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: all 0.3s;
+  order: -1; /* Move o botão para o início do flex container */
+}
+
+.toggle-button:hover {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.panel-content {
+  padding: 10px;
+  max-height: calc(80vh - 50px);
+  overflow-y: auto;
+}
+
+.options-section, .filter-option {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.options-section h4, .filter-option h4 {
   margin-bottom: 8px;
-  color: #e0e0e0;
+  color: var(--text-color);
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-option {
+  margin: 5px 0;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.field-option:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .field-option label {
-  font-size: 0.9em;
-  color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
 }
 
-/* Controle do slider para navegação entre os slides */
+.field-option input[type="checkbox"] {
+  margin: 0;
+}
+
+/* Estilos para scrollbar personalizada */
+#info-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+#info-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+#info-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+#info-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Controles de reprodução */
+#controls {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  max-width: 800px;
+  height: auto;
+  background: var(--background-color);
+  padding: 6px 20px;
+  border-radius: 10px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  backdrop-filter: blur(5px);
+}
+
+#timestamp-info {
+  font-size: 1.1em;
+  color: var(--text-color);
+  margin-bottom: 2px;
+}
+
 #slider-container {
-  margin: 10px 0;
+  width: 100%;
+  margin-bottom: 3px;
 }
 
 #timeline {
   width: 100%;
-  background: rgba(60, 60, 60, 0.5);
-  height: 8px;
+  height: 5px;
   -webkit-appearance: none;
-  border-radius: 4px;
+  background: var(--border-color);
+  border-radius: 3px;
   outline: none;
-}
-
-/* Modificando o estilo da trilha para visualizar o progresso */
-#timeline::-webkit-slider-runnable-track {
-  background: linear-gradient(to right, #00c853 0%, #00c853 var(--progress, 0%), rgba(60, 60, 60, 0.5) var(--progress, 0%));
-  height: 8px;
-  border-radius: 4px;
-}
-
-#timeline::-moz-range-track {
-  background: linear-gradient(to right, #00c853 0%, #00c853 var(--progress, 0%), rgba(60, 60, 60, 0.5) var(--progress, 0%));
-  height: 8px;
-  border-radius: 4px;
 }
 
 #timeline::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border: 2px solid #00c853;
+  width: 15px;
+  height: 15px;
+  background: var(--accent-color);
   border-radius: 50%;
   cursor: pointer;
-  margin-top: -4px; /* para centralizar verticalmente */
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
-#timeline::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border: 2px solid #4d90fe;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-}
-
-/* Estilo dos botões do player */
 #player-controls {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  gap: 10px;
+  margin-bottom: 3px;
 }
 
 #player-controls button {
-  flex: 1;
-  margin: 0 4px;
-  background-color: rgba(60, 60, 60, 0.8);
-  color: #f0f0f0;
-  border: 1px solid #555;
-  border-radius: 4px;
-  padding: 5px 10px;
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
 }
 
 #player-controls button:hover {
-  background-color: rgba(80, 80, 80, 0.9);
+  background: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
-/* Controle de velocidade */
-#speed-label {
+#speed-control {
+  position: fixed;
+  bottom: 10px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.9em;
-  margin-top: 5px;
-  color: #e0e0e0;
+  color: var(--text-color);
+  background: var(--background-color);
+  padding: 8px 15px;
+  border-radius: 10px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
 }
 
 #speed {
-  background: rgba(60, 60, 60, 0.5);
-  height: 6px;
+  width: 100px;
+  height: 5px;
   -webkit-appearance: none;
+  background: var(--border-color);
   border-radius: 3px;
   outline: none;
 }
 
-/* Modificando o estilo da trilha para visualizar o progresso */
-#speed::-webkit-slider-runnable-track {
-  background: linear-gradient(to right, #9e9e9e 0%, #9e9e9e var(--speed-progress, 0%), rgba(60, 60, 60, 0.5) var(--speed-progress, 0%));
-  height: 6px;
-  border-radius: 3px;
-}
-
-#speed::-moz-range-track {
-  background: linear-gradient(to right, #9e9e9e 0%, #9e9e9e var(--speed-progress, 0%), rgba(60, 60, 60, 0.5) var(--speed-progress, 0%));
-  height: 6px;
-  border-radius: 3px;
-}
-
 #speed::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border: 2px solid #9e9e9e;
+  width: 15px;
+  height: 15px;
+  background: var(--accent-color);
   border-radius: 50%;
   cursor: pointer;
-  margin-top: -4px; /* para centralizar verticalmente */
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
-#speed::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border: 2px solid #9e9e9e;
+/* Botão de ajuda */
+#help-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-}
-
-/* Estilo do tooltip dos centroides */
-.centroid-tooltip {
-  background-color: rgba(40, 40, 40, 0.9);
-  color: #f0f0f0;
-  border: 1px solid #555;
-  padding: 4px;
-  font-size: 0.85em;
-  border-radius: 3px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
-}
-
-/* Estilo para a seção de filtro de threshold */
-.filter-option {
-  margin-top: 12px;
-  color: #e0e0e0;
-}
-
-.filter-option label {
-  font-size: 0.9em;
-  margin-right: 10px;
-  color: #e0e0e0;
-}
-
-/* Estilo para o gráfico */
-#polygon-chart-container {
-  background: rgba(35, 35, 35, 0.85) !important;
-  color: #f0f0f0 !important;
-  border-radius: 5px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(3px) !important;
-}
-
-/* Adicione este estilo para o botão de fechar */
-#polygon-chart-container button {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: none;
+  background: var(--secondary-color);
+  color: white;
   border: none;
-  font-size: 18px;
   cursor: pointer;
-  padding: 0 5px;
-  color: #f0f0f0; /* Cor clara para combinar com o tema escuro */
-  transition: color 0.2s, transform 0.2s;
-}
-
-#polygon-chart-container button:hover {
-  color: #ffffff;
-  transform: scale(1.2);
-}
-
-/* Estilo para inputs de radio e checkbox */
-input[type="checkbox"], input[type="radio"] {
-  accent-color: #4d90fe;
-}
-
-/* Estilo para leaflet popups */
-.leaflet-popup-content-wrapper {
-  background: rgba(35, 35, 35, 0.9);
-  color: #f0f0f0;
-  border-radius: 5px;
-}
-
-.leaflet-popup-tip {
-  background: rgba(35, 35, 35, 0.9);
-}
-
-.feature-popup {
-  color: #f0f0f0;
-}
-
-.feature-popup strong {
-  color: #e0e0e0;
-}
-
-/* Estilizar seletor de variáveis */
-#variable-selector {
-  background-color: rgba(50, 50, 50, 0.8);
-  color: #f0f0f0;
-  border: 1px solid #555;
-  border-radius: 3px;
-  padding: 4px;
-}
-
-/* Estilo para o container do gráfico */
-#polygon-chart-container {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 320px;
-  height: auto; /* Permitir altura automática baseada no conteúdo */
-  max-height: 300px; /* Altura máxima para evitar que fique muito grande */
-  background: rgba(35, 35, 35, 0.9) !important;
-  color: #f0f0f0 !important;
-  border-radius: 5px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  padding: 15px;
   z-index: 1000;
-  backdrop-filter: blur(3px);
-  display: none;
-}
-
-#polygon-chart-container h4 {
-  margin: 0;
-  flex-grow: 1;
-  font-size: 14px;
-  text-align: center;
-  color: #f0f0f0;
-}
-
-/* Estilo para os popups de features */
-.feature-popup {
-  padding: 5px;
-  max-width: 300px;
-  font-size: 14px;
-  color: #f0f0f0;
-}
-
-.feature-popup strong {
-  font-weight: bold;
-  color: #e0e0e0;
-}
-
-/* Seletor de variável para o gráfico */
-#variable-selector {
-  display: block;
-  margin: 5px auto;
-  width: 100%;
-  background-color: rgba(50, 50, 50, 0.8);
-  color: #f0f0f0;
-  border: 1px solid #555;
-  border-radius: 3px;
-  padding: 5px;
-  margin-bottom: 10px;
-}
-
-/* Canvas do gráfico */
-#polygon-chart {
-  width: 100%;
-  height: 100px;
-  max-height: 170px; /* Limitar altura máxima do gráfico */
-  display: block;
-}
-
-/* Controle de camadas de mapa */
-#map-layers-control {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-  background: rgba(35, 35, 35, 0.85);
-  color: #f0f0f0;
-  padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(3px);
-  display: none;
-  max-width: 200px;
-}
-
-#map-layers-control h4 {
-  margin: 0;
-  flex-grow: 1;
-  margin-bottom: 10px;
-  font-size: 14px;
-  text-align: center;
-}
-
-#map-layers-control label {
-  display: block;
-  margin: 5px 0;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-#map-layers-control input[type="radio"] {
-  margin-right: 8px;
-  cursor: pointer;
-}
-
-#toggle-map-layers {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  z-index: 999;
-  background: rgba(35, 35, 35, 0.85);
-  color: #f0f0f0;
-  border: none;
-  border-radius: 5px;
-  padding: 7px 10px;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(3px);
-  transition: background-color 0.2s;
   display: flex;
   align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-#toggle-map-layers:hover {
-  background: rgba(50, 50, 50, 0.9);
+/* Modal de ajuda */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
 }
 
-#toggle-map-layers i {
-  margin-right: 5px;
+.modal-content {
+  position: relative;
+  background: white;
+  margin: 50px auto;
+  padding: 20px;
+  width: 80%;
+  max-width: 600px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Controle para botões de minimizar */
-.minimize-button {
-  background: none;
-  border: none;
-  color: #f0f0f0;
-  font-size: 16px;
+.close {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  font-size: 1.5em;
   cursor: pointer;
-  padding: 2px 6px;
-  transition: transform 0.2s, color 0.2s;
 }
 
-.minimize-button:hover, .close-button:hover {
-  color: #ffffff;
-  transform: scale(1.1);
+.help-content {
+  margin-top: 20px;
 }
 
-/* Estilo para cabeçalhos com botão de minimizar */
+.help-content h3 {
+  margin-bottom: 10px;
+  color: var(--primary-color);
+}
+
+.help-content ul {
+  list-style: none;
+  margin-bottom: 20px;
+}
+
+.help-content li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  #info-panel {
+    width: 100%;
+    top: 0;
+    right: 0;
+    border-radius: 0;
+  }
+
+  #controls {
+    height: auto;
+    padding: 8px;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 10px auto;
+  }
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Estilos para o gráfico */
+#polygon-chart-container {
+  position: fixed;
+  width: 30vw;
+  height: 40vh;
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 1000;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  min-width: 250px;
+  min-height: 200px;
+  max-width: 90vw;
+  max-height: 90vh;
+  color: var(--text-color);
+}
+
+/* Estilos para o header do gráfico */
 .header-with-controls {
+  background-color: var(--background-color);
+  padding: 10px;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
-  margin-bottom: 10px;
+  cursor: move;
+  user-select: none;
+  height: 50px;
 }
 
-/* Container para os botões no cabeçalho do gráfico */
+.header-with-controls h4 {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Estilos para os botões de controle */
 .chart-header-buttons {
   display: flex;
-  gap: 8px; /* Espaço entre os botões */
-  margin-left: auto; /* Empurra os botões para a direita */
+  gap: 8px;
 }
 
-/* Estilo para o botão de fechar */
-.close-button {
+.minimize-button, .close-button {
   background: none;
   border: none;
-  color: #f0f0f0;
-  font-size: 18px;
+  font-size: 1.2em;
   cursor: pointer;
-  padding: 0 5px;
-  transition: transform 0.2s, color 0.2s;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  color: var(--text-color);
 }
 
-/* Estilo específico para o container do chart para limitar altura */
+.minimize-button:hover, .close-button:hover {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+/* Estilos para o corpo do gráfico */
 #chart-body {
-  width: 100%;
-  height: 170px; /* Altura fixa para o corpo do gráfico */
-  overflow: hidden; /* Evita overflow */
-  position: relative;
+  padding: 15px;
+  height: calc(100% - 50px);
+  overflow: auto;
+  background-color: var(--background-color);
 }
 
+/* Estilos para o handle de redimensionamento */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, transparent 50%, var(--accent-color) 50%);
+  cursor: nwse-resize;
+  z-index: 1001;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.resize-handle:hover {
+  opacity: 1;
+}
+
+/* Estilos para o estado minimizado */
+#polygon-chart-container.minimized {
+  height: 50px !important;
+}
+
+#polygon-chart-container.minimized #chart-body,
+#polygon-chart-container.minimized .resize-handle {
+  display: none;
+}
+
+#polygon-chart-container.minimized .header-with-controls {
+  border-bottom: none;
+}
+
+/* Estilos para o gráfico em si */
 #polygon-chart {
   width: 100% !important;
   height: 100% !important;
-  max-height: 170px; /* Limitar altura máxima do gráfico */
-  display: block;
 }
 
-/* Container para os botões no cabeçalho do gráfico */
-.chart-header-buttons {
-  display: flex;
-  align-items: center;
+/* Estilos para o seletor de variável */
+#variable-selector {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+#variable-selector:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* Estilos para scrollbar personalizada */
+#chart-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#chart-body::-webkit-scrollbar-track {
+  background: var(--background-color);
+}
+
+#chart-body::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+#chart-body::-webkit-scrollbar-thumb:hover {
+  opacity: 0.8;
+}
+
+/* Efeito de hover no container */
+#polygon-chart-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Efeito de arrasto ativo */
+#polygon-chart-container.dragging {
+  cursor: move;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Efeito de redimensionamento ativo */
+#polygon-chart-container.resizing {
+  cursor: nwse-resize;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Tooltips e popups */
+.centroid-tooltip {
+  background: var(--background-color);
+  color: var(--text-color);
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  border: 1px solid var(--border-color);
+}
+
+.feature-popup {
+  background: var(--background-color);
+  color: var(--text-color);
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  border: 1px solid var(--border-color);
+}
+
+.feature-popup strong {
+  color: var(--accent-color);
 }
